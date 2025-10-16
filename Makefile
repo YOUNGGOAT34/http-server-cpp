@@ -1,7 +1,7 @@
 
 CPP=g++
 
-FLAGS:=-Wall -Wextra
+FLAGS:=-Wall -Wextra -std=c++23
 
 SRC:=$(wildcard *.cpp)
 
