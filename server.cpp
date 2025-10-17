@@ -43,11 +43,19 @@ void server(void){
 
    std::cout<<WHITE"Waiting for client connection" RESET<<std::endl;
 
-   if(accept(server_fd,(struct sockaddr *)&client_address,&client_address_size)==-1){
+   i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
+
+   if(client_fd==-1){
        error("Failed to accept connection");
    }
 
    std::cout<<"Accepted connection"<<std::endl;
+
+   ssize_t bytes_sent=send(client_fd,"HTTP/1.1 200 ok\r\n\r\n",23,0);
+
+   if(bytes_sent==-1){
+       error("Failed to send response to client")
+   }
 
    close(server_fd);
 
