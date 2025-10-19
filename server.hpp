@@ -38,11 +38,18 @@ typedef unsigned long int u64;
 
 class Server{
     public:
+         enum class STATUS{
+            OK=200
+         };
+    private:
+            std::string Version;
+            STATUS code;
+            
+    public:
             Server(){}
-            void error(const i8 *message);
-            void start_server();
+            void start_server(void);
 };
 
-void server(void);
+void error(const i8 *message);
 
 #endif

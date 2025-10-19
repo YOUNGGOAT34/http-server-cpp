@@ -2,7 +2,7 @@
 #include "server.hpp"
 
 
-void Server:: error(const i8 *message){
+void error(const i8 *message){
    
    std::print(std::cerr,RED"ERROR: {} ({})\n" RESET,message,strerror(errno));
 
