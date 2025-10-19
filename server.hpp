@@ -15,17 +15,17 @@
 
 //output colors
 
-#define RED   "\033[1;31m"
-#define GREEN   "\033[1;32m"
-#define YELLOW "\033[1;33m"
-#define RESET "\033[0m"
-#define WHITE "\033[1;37m"
+constexpr auto RED=   "\033[1;31m";
+constexpr auto GREEN=   "\033[1;32m";
+constexpr auto YELLOW= "\033[1;33m";
+constexpr auto RESET ="\033[0m";
+constexpr auto WHITE= "\033[1;37m";
 
-#define SA struct sockaddr_in
-#define PORT 4221
+using SA =struct sockaddr_in;
+constexpr auto PORT =4221;
 
 //signed data types
-// typedef char i8;
+
 using i8=char;
 using i16=signed short int;
 using i32= signed int;

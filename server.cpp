@@ -4,7 +4,7 @@
 
 void error(const i8 *message){
    
-   std::print(std::cerr,RED"ERROR: {} ({})\n" RESET,message,strerror(errno));
+   std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
 
    exit(EXIT_FAILURE);
 }
@@ -26,7 +26,6 @@ void Server::start_server(void){
    }
 
    SA server_address;
-   std::cout<<sizeof(Server::STATUS::OK)<<std::endl;
 
    server_address.sin_family=AF_INET;
    server_address.sin_addr.s_addr=INADDR_ANY;
@@ -44,7 +43,7 @@ void Server::start_server(void){
    SA client_address;
    socklen_t client_address_size=sizeof(client_address);
 
-   std::cout<<WHITE"Waiting for client connection" RESET<<std::endl;
+   std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
    i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
 
