@@ -25,25 +25,27 @@
 #define PORT 4221
 
 //signed data types
-typedef char i8;
-typedef signed short int i16;
-typedef signed int i32;
-typedef signed long int i64;
+// typedef char i8;
+using i8=char;
+using i16=signed short int;
+using i32= signed int;
+using i64= signed long int;
 //unsigned data types
-typedef unsigned char u8;
-typedef unsigned short int u16;
-typedef unsigned int u32;
-typedef unsigned long int u64;
+using u8= unsigned char;
+using u16=unsigned short int;
+using u32= unsigned int;
+using u64=unsigned long int;
 
 
 class Server{
     public:
-         enum class STATUS{
+         enum class STATUS:i32{
             OK=200
          };
     private:
             std::string Version;
             STATUS code;
+            std::string body;
             
     public:
             Server(){}

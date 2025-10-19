@@ -10,6 +10,8 @@ void error(const i8 *message){
 }
 
 void Server::start_server(void){
+
+   
    
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
@@ -24,6 +26,7 @@ void Server::start_server(void){
    }
 
    SA server_address;
+   std::cout<<sizeof(Server::STATUS::OK)<<std::endl;
 
    server_address.sin_family=AF_INET;
    server_address.sin_addr.s_addr=INADDR_ANY;
