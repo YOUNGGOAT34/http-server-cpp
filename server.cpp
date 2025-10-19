@@ -1,15 +1,15 @@
 
-#include "server.h"
+#include "server.hpp"
 
 
-void error(const i8 *message){
+void Server:: error(const i8 *message){
    
    std::print(std::cerr,RED"ERROR: {} ({})\n" RESET,message,strerror(errno));
 
    exit(EXIT_FAILURE);
 }
 
-void server(void){
+void Server::start_server(void){
    
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
@@ -54,7 +54,7 @@ void server(void){
    ssize_t bytes_sent=send(client_fd,"HTTP/1.1 200 ok\r\n\r\n",23,0);
 
    if(bytes_sent==-1){
-       error("Failed to send response to client")
+       error("Failed to send response to client");
    }
 
    close(server_fd);

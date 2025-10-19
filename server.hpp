@@ -36,6 +36,12 @@ typedef unsigned int u32;
 typedef unsigned long int u64;
 
 
+class Server{
+    public:
+            Server(){}
+            void error(const i8 *message);
+            void start_server();
+};
 
 void server(void);
 
