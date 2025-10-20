@@ -13,13 +13,13 @@ std::string status_code_to_string(Server::STATUS code){
    switch(code){
         case Server::STATUS::OK:
                return "200 OK";
+        case Server::STATUS::NOT_FOUND:
+               return "404 NOT FOUND";
         default: return "500 Unknown";
 
    }
     
 } 
-
-// Server::Server(std::string version,STATUS code):Version(version),Code(code){}
 
 
 void Server::start_server(void){
@@ -64,19 +64,47 @@ void Server::start_server(void){
 
    std::cout<<"Accepted connection"<<std::endl;
 
-   ssize_t bytes_sent=send(client_fd,"HTTP/1.1 200 ok\r\n\r\n",23,0);
+    i8 buffer[BUFFER_SIZE]={0};
+
+  
+
+   ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
+   if(received_bytes<0){
+        error("Error receiving client request");
+   }
+   buffer[received_bytes]='\0';
+   std::string request(buffer);
+
+   std::istringstream raw_request_line(request);
+   std::string request_line;
+   std::getline(raw_request_line,request_line);
+
+   if(!request_line.empty() && request_line.back()=='\r'){
+       request_line.pop_back();
+   }
+
+   std::istringstream line_stream(request_line);
+
+   std::string method,path,version;
+
+   line_stream >> method >> path >> version;
+   STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
+
+   std::string res=response(status);
+   ssize_t bytes_sent=send(client_fd,res.c_str(),res.size(),0);
+
+
 
    if(bytes_sent==-1){
        error("Failed to send response to client");
    }
 
    close(server_fd);
-
 }
 
-std::string Server::response_ok(){
+std::string Server::response(STATUS status){
       Version="HTTP/1.1";
-      Code=STATUS::OK;
+      Code=status;
 
       return std::format(
            "{} {}\r\n"

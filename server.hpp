@@ -9,6 +9,7 @@
 #include <format>
 #include <cerrno>
 #include <print>
+#include <sstream>
 #include <unistd.h>
 
 
@@ -23,6 +24,7 @@ constexpr auto WHITE= "\033[1;37m";
 
 using SA =struct sockaddr_in;
 constexpr auto PORT =4221;
+constexpr auto BUFFER_SIZE=4096;
 
 //signed data types
 
@@ -40,7 +42,8 @@ using u64=unsigned long int;
 class Server{
     public:
          enum class STATUS:i32{
-            OK=200
+            OK=200,
+            NOT_FOUND=404
          };
     private:
             std::string Version;
@@ -51,7 +54,7 @@ class Server{
     public:
             Server(){}
             void start_server(void);
-            std::string response_ok();
+            std::string response(STATUS status);
 };
 
 void error(const i8 *message);
