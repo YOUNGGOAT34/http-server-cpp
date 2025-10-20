@@ -44,14 +44,17 @@ class Server{
          };
     private:
             std::string Version;
-            STATUS code;
+            STATUS Code;
             std::string body;
+
             
     public:
             Server(){}
             void start_server(void);
+            std::string response_ok();
 };
 
 void error(const i8 *message);
+std::string status_code_to_string(Server::STATUS code);
 
 #endif

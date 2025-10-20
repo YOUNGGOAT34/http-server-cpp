@@ -9,16 +9,27 @@ void error(const i8 *message){
    exit(EXIT_FAILURE);
 }
 
+std::string status_code_to_string(Server::STATUS code){
+   switch(code){
+        case Server::STATUS::OK:
+               return "200 OK";
+        default: return "500 Unknown";
+
+   }
+    
+} 
+
+// Server::Server(std::string version,STATUS code):Version(version),Code(code){}
+
+
 void Server::start_server(void){
 
-   
-   
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
    if(server_fd<0){
       error("socket FD creation error");
    }
-
+   
    i32 reuse=1;
 
    if(setsockopt(server_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse))<0){
@@ -62,3 +73,16 @@ void Server::start_server(void){
    close(server_fd);
 
 }
+
+std::string Server::response_ok(){
+      Version="HTTP/1.1";
+      Code=STATUS::OK;
+
+      return std::format(
+           "{} {}\r\n"
+           "\r\n",
+           Version,
+           status_code_to_string(Code)   
+      );
+}
+
