@@ -54,7 +54,8 @@ class Server{
     public:
             Server(){}
             void start_server(void);
-            std::string response(STATUS status);
+            std::string response(STATUS status,const std::string& __body);
+            std::string extract_request_body(const std::string& path );
 };
 
 void error(const i8 *message);

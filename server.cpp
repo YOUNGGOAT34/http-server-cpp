@@ -19,7 +19,19 @@ std::string status_code_to_string(Server::STATUS code){
 
    }
     
-} 
+}
+
+
+
+std::string Server::extract_request_body(const std::string& path){
+
+   ssize_t position=path.find_last_of('/');
+
+   return path.substr(position+1);
+      
+}
+
+
 
 
 void Server::start_server(void){
@@ -88,12 +100,13 @@ void Server::start_server(void){
    std::string method,path,version;
 
    line_stream >> method >> path >> version;
-   STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
+   
+   // STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
 
-   std::string res=response(status);
+    
+
+   std::string res=response(STATUS::OK,extract_request_body(path));
    ssize_t bytes_sent=send(client_fd,res.c_str(),res.size(),0);
-
-
 
    if(bytes_sent==-1){
        error("Failed to send response to client");
@@ -102,15 +115,24 @@ void Server::start_server(void){
    close(server_fd);
 }
 
-std::string Server::response(STATUS status){
+//HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\nabc
+
+std::string Server::response(STATUS status,const std::string& __body){
       Version="HTTP/1.1";
       Code=status;
+      body=__body;
+
 
       return std::format(
            "{} {}\r\n"
-           "\r\n",
+           "Content-Type: text/plain\r\n"
+           "Content-Length: {}\r\n"
+           "\r\n"
+           "{}",
            Version,
-           status_code_to_string(Code)   
+           status_code_to_string(Code),
+           body.size(),
+           body   
       );
 }
 
