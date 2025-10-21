@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <print>
 #include <sstream>
+#include <vector>
 #include <unistd.h>
 
 
@@ -56,6 +57,9 @@ class Server{
             void start_server(void);
             std::string response(STATUS status,const std::string& __body);
             std::string extract_request_body(const std::string& path );
+            std::string tokenize_request(i8 *buffer);
+            std::vector<std::string> extract_request_line(const std::string& request);
+            std::string extract_user_agent(const std::string& headers);
 };
 
 void error(const i8 *message);

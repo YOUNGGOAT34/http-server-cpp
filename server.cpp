@@ -32,6 +32,42 @@ std::string Server::extract_request_body(const std::string& path){
 }
 
 
+std::string Server::extract_user_agent(const std::string& headers){
+   return "";
+     
+}
+
+
+std::vector<std::string> Server::extract_request_line(const std::string& request){
+   std::istringstream raw_request_line(request);
+   std::string request_line;
+
+   std::getline(raw_request_line,request_line);
+
+   if(!request_line.empty() && request_line.back()=='\r'){
+       request_line.pop_back();
+   }
+
+   std::istringstream line_stream(request_line);
+
+   std::string method,path,version;
+
+   line_stream >> method >> path >> version;
+
+   return {method,path,version};
+   
+}
+
+
+std::string Server::tokenize_request(i8 *buffer){
+
+   std::string request(buffer);
+
+    return "";
+     
+}
+
+
 
 
 void Server::start_server(void){
@@ -85,21 +121,7 @@ void Server::start_server(void){
         error("Error receiving client request");
    }
    buffer[received_bytes]='\0';
-   std::string request(buffer);
-
-   std::istringstream raw_request_line(request);
-   std::string request_line;
-   std::getline(raw_request_line,request_line);
-
-   if(!request_line.empty() && request_line.back()=='\r'){
-       request_line.pop_back();
-   }
-
-   std::istringstream line_stream(request_line);
-
-   std::string method,path,version;
-
-   line_stream >> method >> path >> version;
+   
    
    // STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
 
