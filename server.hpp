@@ -11,6 +11,7 @@
 #include <print>
 #include <sstream>
 #include <vector>
+#include <variant>
 #include <unistd.h>
 
 
@@ -46,6 +47,11 @@ class Server{
             OK=200,
             NOT_FOUND=404
          };
+
+         enum class REQUEST_TYPE{
+              REQUEST_LINE,
+              HEADERS_LINE 
+         };
     private:
             std::string Version;
             STATUS Code;
@@ -57,7 +63,7 @@ class Server{
             void start_server(void);
             std::string response(STATUS status,const std::string& __body);
             std::string extract_request_body(const std::string& path );
-            std::string tokenize_request(i8 *buffer);
+            std::variant<std::string,std::vector<std::string>> tokenize_request(i8 *buffer,REQUEST_TYPE req);
             std::vector<std::string> extract_request_line(const std::string& request);
             std::string extract_user_agent(const std::string& headers);
 };

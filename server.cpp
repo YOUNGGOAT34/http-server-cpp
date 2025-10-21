@@ -59,10 +59,17 @@ std::vector<std::string> Server::extract_request_line(const std::string& request
 }
 
 
-std::string Server::tokenize_request(i8 *buffer){
-
+std::variant<std::string,std::vector<std::string>> Server::tokenize_request(i8 *buffer,REQUEST_TYPE req){
    std::string request(buffer);
+   switch (req){
 
+      case REQUEST_TYPE::HEADERS_LINE:
+      break;
+      case REQUEST_TYPE::REQUEST_LINE:
+      return extract_request_line(request);
+            
+   }
+      
     return "";
      
 }
@@ -126,8 +133,13 @@ void Server::start_server(void){
    // STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
 
     
-
-   std::string res=response(STATUS::OK,extract_request_body(path));
+   std::variant<std::string,std::vector<std::string>> tokenized_request=tokenize_request(buffer,REQUEST_TYPE::REQUEST_LINE);
+   std::string res;
+   if(auto request_ptr=std::get_if<std::vector<std::string>>(&tokenized_request)){
+      res=response(STATUS::OK,extract_request_body((*request_ptr)[1]));
+   }
+    
+  
    ssize_t bytes_sent=send(client_fd,res.c_str(),res.size(),0);
 
    if(bytes_sent==-1){
