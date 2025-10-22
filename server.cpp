@@ -33,9 +33,14 @@ std::string Server::extract_request_body(const std::string& path){
 }
 
 
-ssize_t Server::user_agent_endpoint(std::unordered_map<std::string,std::string> headers){
-   
-   return "";
+ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<std::string,std::string> headers){
+
+   if(headers.find("User-Agent")==headers.end()){
+       error("User-Agent not found in the headers");
+   }
+
+   std::string res=response(STATUS::OK,headers["User-Agent"]);
+   return send(client_fd,res.c_str(),res.size(),0);
 }
 
 
@@ -110,17 +115,11 @@ std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
 
          }
 
-         
-
-
        }
 
        return headers;
     
 }
-
-
-
 
 
 
@@ -207,6 +206,9 @@ void Server::start_server(void){
    if(path.starts_with("/echo/")){
 
       bytes_sent=echo_endpoint(path,client_fd);
+   }else if(path.starts_with("/user-agent")){
+       std::unordered_map<std::string,std::string> headers=extract_headers(buffer);
+       bytes_sent=user_agent_endpoint(client_fd,headers);
    }
     
    if(bytes_sent==-1){
