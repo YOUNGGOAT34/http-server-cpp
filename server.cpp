@@ -169,7 +169,9 @@ void Server::start_server(void){
       }
    
       std::cout<<"Accepted connection"<<std::endl;
-      handle_client(client_fd);
+  
+
+      std::thread client_connection(handle_client(client_fd));
         
    }
 
@@ -204,6 +206,8 @@ void Server::handle_client(i32 client_fd){
       if(bytes_sent==-1){
           error("Failed to send response to client");
       }
+
+      close(client_fd);
     
 }
 
