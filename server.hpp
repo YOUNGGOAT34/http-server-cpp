@@ -60,6 +60,7 @@ class Server{
             ssize_t user_agent_endpoint(i32 client_fd,std::unordered_map<std::string,std::string> headers);
             ssize_t echo_endpoint(std::string path,i32 client_fd);
             std::string status_code_to_string(Server::STATUS code);
+            void handle_client(i32 client_fd);
 
 
             

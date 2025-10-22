@@ -6,9 +6,7 @@
 
 
 void error(const i8 *message){
-   
    std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
-
    exit(EXIT_FAILURE);
 }
 
@@ -42,8 +40,6 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<std::string
    std::string res=response(STATUS::OK,headers["User-Agent"]);
    return send(client_fd,res.c_str(),res.size(),0);
 }
-
-
 
 
 std::vector<std::string> Server::extract_request_line(i8 *buffer){
@@ -158,49 +154,58 @@ void Server::start_server(void){
        error("Failed to listen on PORT 4221");
    }
 
+   
    SA client_address;
    socklen_t client_address_size=sizeof(client_address);
-
+   
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
-   i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
+   while(1){
 
-   if(client_fd==-1){
-       error("Failed to accept connection");
-   }
-
-   std::cout<<"Accepted connection"<<std::endl;
-
-    i8 buffer[BUFFER_SIZE]={0};
-
-   ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
-   if(received_bytes<0){
-        error("Error receiving client request");
-   }
-   buffer[received_bytes]='\0';
+      i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
    
-   std::vector<std::string> request_line=extract_request_line(buffer);
-   std::string path=request_line[1];
-  
+      if(client_fd==-1){
+          error("Failed to accept connection");
+      }
    
-   ssize_t bytes_sent;
-
-   if(path.starts_with("/echo/")){
-
-      bytes_sent=echo_endpoint(path,client_fd);
-   }else if(path.starts_with("/user-agent")){
-       std::unordered_map<std::string,std::string> headers=extract_headers(buffer);
-       bytes_sent=user_agent_endpoint(client_fd,headers);
+      std::cout<<"Accepted connection"<<std::endl;
+      handle_client(client_fd);
+        
    }
-    
-   if(bytes_sent==-1){
-       error("Failed to send response to client");
-   }
+
 
    close(server_fd);
 }
 
-//HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\nabc
+void Server::handle_client(i32 client_fd){
+
+  
+      i8 buffer[BUFFER_SIZE]={0};
+   
+      ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
+      if(received_bytes<0){
+           error("Error receiving client request");
+      }
+      buffer[received_bytes]='\0';
+      
+      std::vector<std::string> request_line=extract_request_line(buffer);
+      std::string path=request_line[1];
+     
+      ssize_t bytes_sent;
+   
+      if(path.starts_with("/echo/")){
+   
+         bytes_sent=echo_endpoint(path,client_fd);
+      }else if(path.starts_with("/user-agent")){
+          std::unordered_map<std::string,std::string> headers=extract_headers(buffer);
+          bytes_sent=user_agent_endpoint(client_fd,headers);
+      }
+       
+      if(bytes_sent==-1){
+          error("Failed to send response to client");
+      }
+    
+}
 
 std::string Server::response(STATUS status,const std::string& __body){
       Version="HTTP/1.1";
