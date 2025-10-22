@@ -60,8 +60,7 @@ class Server{
             std::string body;
             std::string response(STATUS status,const std::string& __body);
             std::string extract_request_body(const std::string& path );
-            std::variant<std::string,std::vector<std::string>> tokenize_request(i8 *buffer,REQUEST_TYPE req);
-            std::vector<std::string> extract_request_line(const std::string& request);
+            std::vector<std::string> extract_request_line(i8 *buffer);
             std::unordered_map<std::string,std::string> extract_headers(i8 *buffer);
             ssize_t user_agent_endpoint(i32 client_fd,std::unordered_map<std::string,std::string> headers);
             ssize_t echo_endpoint(std::string path,i32 client_fd);

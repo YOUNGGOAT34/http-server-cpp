@@ -46,10 +46,11 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<std::string
 
 
 
-std::vector<std::string> Server::extract_request_line(const std::string& request){
+std::vector<std::string> Server::extract_request_line(i8 *buffer){
+   std::string request(buffer);
    std::istringstream raw_request_line(request);
    std::string request_line;
-
+   
    std::getline(raw_request_line,request_line);
 
    if(!request_line.empty() && request_line.back()=='\r'){
@@ -62,6 +63,7 @@ std::vector<std::string> Server::extract_request_line(const std::string& request
    return {method,path,version};
    
 }
+
 
 std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
        
@@ -123,22 +125,6 @@ std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
 
 
 
-std::variant<std::string,std::vector<std::string>> Server::tokenize_request(i8 *buffer,REQUEST_TYPE req){
-   std::string request(buffer);
-   switch (req){
-
-      case REQUEST_TYPE::HEADERS_LINE:
-      break;
-      case REQUEST_TYPE::REQUEST_LINE:
-      return extract_request_line(request);
-            
-   }
-      
-   return "";
-     
-}  
-
-
 ssize_t Server::echo_endpoint(std::string path,i32 client_fd){
    std::string res=response(STATUS::OK,extract_request_body(path));
    return send(client_fd,res.c_str(),res.size(),0);
@@ -195,11 +181,9 @@ void Server::start_server(void){
    }
    buffer[received_bytes]='\0';
    
-   std::variant<std::string,std::vector<std::string>> tokenized_request=tokenize_request(buffer,REQUEST_TYPE::REQUEST_LINE);
-   std::string path;
-   if(auto request_ptr=std::get_if<std::vector<std::string>>(&tokenized_request)){
-      path=(*request_ptr)[1];
-   }
+   std::vector<std::string> request_line=extract_request_line(buffer);
+   std::string path=request_line[1];
+  
    
    ssize_t bytes_sent;
 
