@@ -224,7 +224,7 @@ std::string Server::response(STATUS status,const std::string& __body){
            version,
            status_code_to_string(status),
            __body.size(),
-           body   
+           __body   
       );
 }
 

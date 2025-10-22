@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Number of requests
-NUM_REQUESTS=100
+NUM_REQUESTS=1000
 
 for i in $(seq 1 $NUM_REQUESTS); do
   # Send request in background with unique message
@@ -10,5 +10,4 @@ done
 
 # Wait for all background jobs to finish
 wait
-
 echo "All requests completed."
