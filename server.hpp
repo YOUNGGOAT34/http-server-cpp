@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <print>
 #include <sstream>
+#include<unordered_map>
 #include <vector>
 #include <variant>
 #include <unistd.h>
@@ -52,21 +53,24 @@ class Server{
               REQUEST_LINE,
               HEADERS_LINE 
          };
+
     private:
             std::string Version;
             STATUS Code;
             std::string body;
+            std::string response(STATUS status,const std::string& __body);
+            std::string extract_request_body(const std::string& path );
+            std::variant<std::string,std::vector<std::string>> tokenize_request(i8 *buffer,REQUEST_TYPE req);
+            std::vector<std::string> extract_request_line(const std::string& request);
+            std::string user_agent_endpoint(std::vector<std::string,std::string> headers);
+            std::unordered_map<std::string,std::string> extract_headers(i8 *buffer);
+            ssize_t echo_endpoint(std::string path,i32 client_fd);
+
 
             
     public:
             Server(){}
             void start_server(void);
-            std::string response(STATUS status,const std::string& __body);
-            std::string extract_request_body(const std::string& path );
-            std::variant<std::string,std::vector<std::string>> tokenize_request(i8 *buffer,REQUEST_TYPE req);
-            std::vector<std::string> extract_request_line(const std::string& request);
-            std::string extract_user_agent(const std::string& headers);
-            ssize_t echo_endpoint(std::string path,i32 client_fd);
 
 };
 

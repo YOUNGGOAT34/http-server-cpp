@@ -33,10 +33,12 @@ std::string Server::extract_request_body(const std::string& path){
 }
 
 
-std::string Server::extract_user_agent(const std::string& headers){
+ssize_t Server::user_agent_endpoint(std::vector<std::string,std::string> headers){
+   
    return "";
-     
 }
+
+
 
 
 std::vector<std::string> Server::extract_request_line(const std::string& request){
@@ -48,16 +50,75 @@ std::vector<std::string> Server::extract_request_line(const std::string& request
    if(!request_line.empty() && request_line.back()=='\r'){
        request_line.pop_back();
    }
-
    std::istringstream line_stream(request_line);
-
    std::string method,path,version;
-
    line_stream >> method >> path >> version;
 
    return {method,path,version};
    
 }
+
+std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
+       
+   std::unordered_map<std::string,std::string> headers;
+       
+       std::istringstream buffer_stream(buffer);
+       std::string line;
+
+       bool is_request_line=true;
+
+       while(std::getline(buffer_stream,line)){
+
+         if(!line.empty() && line.back()=='\r'){
+             line.pop_back();
+         }
+        
+         if(is_request_line){
+            is_request_line=false;
+            continue;
+         }
+
+         if(line.empty()){
+            break;
+         }
+         
+         size_t colon_position=line.find(':');
+
+         if(colon_position!=std::string::npos){
+          
+            std::string key=line.substr(0,colon_position);
+            std::string value=line.substr(colon_position+1);
+
+            /*
+               Header is usually something like Host: localhost:port \r\n
+               right now we have trimmed the crlf
+
+               now we have the Host as the key ,and the localhost and port and the value ,but the value might
+               contain some spaces at the start and we shoulheaders[key]=value;d get rid of that
+
+            */
+
+            size_t first_non_space_position=value.find_first_not_of(" \t");
+            if(first_non_space_position!=std::string::npos){
+                value=value.substr(first_non_space_position);
+            }else{
+               value.clear();
+            }
+
+
+            headers[key]=value;
+
+         }
+
+         
+
+
+       }
+
+       return headers;
+    
+}
+
 
 
 
@@ -74,19 +135,17 @@ std::variant<std::string,std::vector<std::string>> Server::tokenize_request(i8 *
             
    }
       
-    return "";
+   return "";
      
 }  
 
 
 ssize_t Server::echo_endpoint(std::string path,i32 client_fd){
-   
    std::string res=response(STATUS::OK,extract_request_body(path));
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
 void Server::start_server(void){
-
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
    if(server_fd<0){
@@ -137,9 +196,6 @@ void Server::start_server(void){
    }
    buffer[received_bytes]='\0';
    
-   
-
-    
    std::variant<std::string,std::vector<std::string>> tokenized_request=tokenize_request(buffer,REQUEST_TYPE::REQUEST_LINE);
    std::string path;
    if(auto request_ptr=std::get_if<std::vector<std::string>>(&tokenized_request)){
