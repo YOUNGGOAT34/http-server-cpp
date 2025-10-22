@@ -171,7 +171,7 @@ void Server::start_server(void){
       std::cout<<"Accepted connection"<<std::endl;
   
 
-      std::thread client_connection(handle_client(client_fd));
+      std::thread(&Server::handle_client,this,client_fd).detach();
         
    }
 
@@ -207,25 +207,23 @@ void Server::handle_client(i32 client_fd){
           error("Failed to send response to client");
       }
 
+      shutdown(client_fd,SHUT_WR);
+
       close(client_fd);
     
 }
 
 std::string Server::response(STATUS status,const std::string& __body){
-      Version="HTTP/1.1";
-      Code=status;
-      body=__body;
-
-
+      std::string version="HTTP/1.1";
       return std::format(
            "{} {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
            "\r\n"
            "{}",
-           Version,
-           status_code_to_string(Code),
-           body.size(),
+           version,
+           status_code_to_string(status),
+           __body.size(),
            body   
       );
 }
