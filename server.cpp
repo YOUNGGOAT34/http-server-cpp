@@ -33,7 +33,7 @@ std::string Server::extract_request_body(const std::string& path){
 }
 
 
-ssize_t Server::user_agent_endpoint(std::vector<std::string,std::string> headers){
+ssize_t Server::user_agent_endpoint(std::unordered_map<std::string,std::string> headers){
    
    return "";
 }
