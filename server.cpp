@@ -12,7 +12,7 @@ void error(const i8 *message){
    exit(EXIT_FAILURE);
 }
 
-std::string status_code_to_string(Server::STATUS code){
+std::string Server::status_code_to_string(Server::STATUS code){
    switch(code){
         case Server::STATUS::OK:
                return "200 OK";
@@ -172,8 +172,6 @@ void Server::start_server(void){
    std::cout<<"Accepted connection"<<std::endl;
 
     i8 buffer[BUFFER_SIZE]={0};
-
-  
 
    ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
    if(received_bytes<0){

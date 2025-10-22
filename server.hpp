@@ -49,11 +49,6 @@ class Server{
             NOT_FOUND=404
          };
 
-         enum class REQUEST_TYPE{
-              REQUEST_LINE,
-              HEADERS_LINE 
-         };
-
     private:
             std::string Version;
             STATUS Code;
@@ -64,6 +59,7 @@ class Server{
             std::unordered_map<std::string,std::string> extract_headers(i8 *buffer);
             ssize_t user_agent_endpoint(i32 client_fd,std::unordered_map<std::string,std::string> headers);
             ssize_t echo_endpoint(std::string path,i32 client_fd);
+            std::string status_code_to_string(Server::STATUS code);
 
 
             
@@ -74,6 +70,6 @@ class Server{
 };
 
 void error(const i8 *message);
-std::string status_code_to_string(Server::STATUS code);
+
 
 #endif
