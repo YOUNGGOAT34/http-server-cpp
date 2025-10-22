@@ -66,6 +66,8 @@ class Server{
             std::variant<std::string,std::vector<std::string>> tokenize_request(i8 *buffer,REQUEST_TYPE req);
             std::vector<std::string> extract_request_line(const std::string& request);
             std::string extract_user_agent(const std::string& headers);
+            ssize_t echo_endpoint(std::string path,i32 client_fd);
+
 };
 
 void error(const i8 *message);

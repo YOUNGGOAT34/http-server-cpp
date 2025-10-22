@@ -1,6 +1,9 @@
 
 #include "server.hpp"
 
+//echo end point
+//user agent end point
+
 
 void error(const i8 *message){
    
@@ -24,9 +27,7 @@ std::string status_code_to_string(Server::STATUS code){
 
 
 std::string Server::extract_request_body(const std::string& path){
-
    ssize_t position=path.find_last_of('/');
-
    return path.substr(position+1);
       
 }
@@ -59,6 +60,9 @@ std::vector<std::string> Server::extract_request_line(const std::string& request
 }
 
 
+
+
+
 std::variant<std::string,std::vector<std::string>> Server::tokenize_request(i8 *buffer,REQUEST_TYPE req){
    std::string request(buffer);
    switch (req){
@@ -72,10 +76,14 @@ std::variant<std::string,std::vector<std::string>> Server::tokenize_request(i8 *
       
     return "";
      
+}  
+
+
+ssize_t Server::echo_endpoint(std::string path,i32 client_fd){
+   
+   std::string res=response(STATUS::OK,extract_request_body(path));
+   return send(client_fd,res.c_str(),res.size(),0);
 }
-
-
-
 
 void Server::start_server(void){
 
@@ -130,18 +138,21 @@ void Server::start_server(void){
    buffer[received_bytes]='\0';
    
    
-   // STATUS status=path=="/"?STATUS::OK:STATUS::NOT_FOUND;
 
     
    std::variant<std::string,std::vector<std::string>> tokenized_request=tokenize_request(buffer,REQUEST_TYPE::REQUEST_LINE);
-   std::string res;
+   std::string path;
    if(auto request_ptr=std::get_if<std::vector<std::string>>(&tokenized_request)){
-      res=response(STATUS::OK,extract_request_body((*request_ptr)[1]));
+      path=(*request_ptr)[1];
+   }
+   
+   ssize_t bytes_sent;
+
+   if(path.starts_with("/echo/")){
+
+      bytes_sent=echo_endpoint(path,client_fd);
    }
     
-  
-   ssize_t bytes_sent=send(client_fd,res.c_str(),res.size(),0);
-
    if(bytes_sent==-1){
        error("Failed to send response to client");
    }
