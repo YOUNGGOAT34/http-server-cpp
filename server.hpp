@@ -42,6 +42,9 @@ using u16=unsigned short int;
 using u32= unsigned int;
 using u64=unsigned long int;
 using string=std::string;
+template<typename K,typename V>
+using hashMap=std::unordered_map<K,V>;
+
 
 
 class Server{
@@ -58,8 +61,8 @@ class Server{
             string response(STATUS status,const string& __body);
             string extract_request_body(const string& path );
             std::vector<string> extract_request_line(i8 *buffer);
-            std::unordered_map<string,string> extract_headers(i8 *buffer);
-            ssize_t user_agent_endpoint(i32 client_fd,std::unordered_map<string,string> headers);
+            hashMap<string,string> extract_headers(i8 *buffer);
+            ssize_t user_agent_endpoint(i32 client_fd,hashMap<string,string> headers);
             ssize_t echo_endpoint(string path,i32 client_fd);
             string status_code_to_string(Server::STATUS code);
             void handle_client(i32 client_fd);

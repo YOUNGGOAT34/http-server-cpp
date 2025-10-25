@@ -28,7 +28,7 @@ string Server::extract_request_body(const string& path){
 }
 
 
-ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<string,string> headers){
+ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers){
 
    if(headers.find("User-Agent")==headers.end()){
        error("User-Agent not found in the headers");
@@ -58,9 +58,9 @@ std::vector<string> Server::extract_request_line(i8 *buffer){
 }
 
 
-std::unordered_map<string,string> Server::extract_headers(i8 *buffer){
+hashMap<string,string> Server::extract_headers(i8 *buffer){
        
-   std::unordered_map<string,string> headers;
+      hashMap<string,string> headers;
        
        std::istringstream buffer_stream(buffer);
        string line;
@@ -196,7 +196,7 @@ void Server::handle_client(i32 client_fd){
    
          bytes_sent=echo_endpoint(path,client_fd);
       }else if(path.starts_with("/user-agent")){
-          std::unordered_map<string,string> headers=extract_headers(buffer);
+          hashMap<string,string> headers=extract_headers(buffer);
           bytes_sent=user_agent_endpoint(client_fd,headers);
       }
        
