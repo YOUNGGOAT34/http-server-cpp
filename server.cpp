@@ -21,7 +21,7 @@ string Server::status_code_to_string(Server::STATUS code){
 
 
 
-string Server::extract_request_body(const string& path){
+   string Server::extract_request_body(const string& path){
    ssize_t position=path.find_last_of('/');
    return path.substr(position+1);
       
@@ -39,7 +39,7 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers
 }
 
 
-std::vector<string> Server::extract_request_line(i8 *buffer){
+   vector<string> Server::extract_request_line(i8 *buffer){
    string request(buffer);
    std::istringstream raw_request_line(request);
    string request_line;
@@ -187,7 +187,7 @@ void Server::handle_client(i32 client_fd){
       }
       buffer[received_bytes]='\0';
       
-      std::vector<string> request_line=extract_request_line(buffer);
+      vector<string> request_line=extract_request_line(buffer);
       string path=request_line[1];
      
       ssize_t bytes_sent;
