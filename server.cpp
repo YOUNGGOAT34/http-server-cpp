@@ -1,16 +1,13 @@
 
 #include "server.hpp"
 
-//echo end point
-//user agent end point
-
 
 void error(const i8 *message){
    std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
    exit(EXIT_FAILURE);
 }
 
-std::string Server::status_code_to_string(Server::STATUS code){
+string Server::status_code_to_string(Server::STATUS code){
    switch(code){
         case Server::STATUS::OK:
                return "200 OK";
@@ -24,28 +21,28 @@ std::string Server::status_code_to_string(Server::STATUS code){
 
 
 
-std::string Server::extract_request_body(const std::string& path){
+string Server::extract_request_body(const string& path){
    ssize_t position=path.find_last_of('/');
    return path.substr(position+1);
       
 }
 
 
-ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<std::string,std::string> headers){
+ssize_t Server::user_agent_endpoint(i32 client_fd,std::unordered_map<string,string> headers){
 
    if(headers.find("User-Agent")==headers.end()){
        error("User-Agent not found in the headers");
    }
 
-   std::string res=response(STATUS::OK,headers["User-Agent"]);
+   string res=response(STATUS::OK,headers["User-Agent"]);
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
 
-std::vector<std::string> Server::extract_request_line(i8 *buffer){
-   std::string request(buffer);
+std::vector<string> Server::extract_request_line(i8 *buffer){
+   string request(buffer);
    std::istringstream raw_request_line(request);
-   std::string request_line;
+   string request_line;
    
    std::getline(raw_request_line,request_line);
 
@@ -53,7 +50,7 @@ std::vector<std::string> Server::extract_request_line(i8 *buffer){
        request_line.pop_back();
    }
    std::istringstream line_stream(request_line);
-   std::string method,path,version;
+   string method,path,version;
    line_stream >> method >> path >> version;
 
    return {method,path,version};
@@ -61,12 +58,12 @@ std::vector<std::string> Server::extract_request_line(i8 *buffer){
 }
 
 
-std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
+std::unordered_map<string,string> Server::extract_headers(i8 *buffer){
        
-   std::unordered_map<std::string,std::string> headers;
+   std::unordered_map<string,string> headers;
        
        std::istringstream buffer_stream(buffer);
-       std::string line;
+       string line;
 
        bool is_request_line=true;
 
@@ -87,10 +84,10 @@ std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
          
          size_t colon_position=line.find(':');
 
-         if(colon_position!=std::string::npos){
+         if(colon_position!=string::npos){
           
-            std::string key=line.substr(0,colon_position);
-            std::string value=line.substr(colon_position+1);
+            string key=line.substr(0,colon_position);
+            string value=line.substr(colon_position+1);
 
             /*
                Header is usually something like Host: localhost:port \r\n
@@ -102,7 +99,7 @@ std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
             */
 
             size_t first_non_space_position=value.find_first_not_of(" \t");
-            if(first_non_space_position!=std::string::npos){
+            if(first_non_space_position!=string::npos){
                 value=value.substr(first_non_space_position);
             }else{
                value.clear();
@@ -121,8 +118,8 @@ std::unordered_map<std::string,std::string> Server::extract_headers(i8 *buffer){
 
 
 
-ssize_t Server::echo_endpoint(std::string path,i32 client_fd){
-   std::string res=response(STATUS::OK,extract_request_body(path));
+ssize_t Server::echo_endpoint(string path,i32 client_fd){
+   string res=response(STATUS::OK,extract_request_body(path));
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
@@ -168,7 +165,7 @@ void Server::start_server(void){
           error("Failed to accept connection");
       }
    
-      std::cout<<"Accepted connection\n"
+      std::cout<<"Accepted connection\n";
   
 
       std::thread(&Server::handle_client,this,client_fd).detach();
@@ -190,8 +187,8 @@ void Server::handle_client(i32 client_fd){
       }
       buffer[received_bytes]='\0';
       
-      std::vector<std::string> request_line=extract_request_line(buffer);
-      std::string path=request_line[1];
+      std::vector<string> request_line=extract_request_line(buffer);
+      string path=request_line[1];
      
       ssize_t bytes_sent;
    
@@ -199,7 +196,7 @@ void Server::handle_client(i32 client_fd){
    
          bytes_sent=echo_endpoint(path,client_fd);
       }else if(path.starts_with("/user-agent")){
-          std::unordered_map<std::string,std::string> headers=extract_headers(buffer);
+          std::unordered_map<string,string> headers=extract_headers(buffer);
           bytes_sent=user_agent_endpoint(client_fd,headers);
       }
        
@@ -213,15 +210,13 @@ void Server::handle_client(i32 client_fd){
     
 }
 
-std::string Server::response(STATUS status,const std::string& __body){
-      std::string version="HTTP/1.1";
+string Server::response(STATUS status,const string& __body){
+      
       return std::format(
-           "{} {}\r\n"
+           "HTTP/1.1 {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
-           "\r\n"
-           "{}",
-           version,
+           "\r\n",
            status_code_to_string(status),
            __body.size(),
            __body   
