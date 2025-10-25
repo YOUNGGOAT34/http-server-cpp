@@ -11,3 +11,5 @@ done
 # Wait for all background jobs to finish
 wait
 echo "All requests completed."
+
+#try thread pools
