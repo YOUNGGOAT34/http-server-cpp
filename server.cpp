@@ -168,7 +168,7 @@ void Server::start_server(void){
           error("Failed to accept connection");
       }
    
-      std::cout<<"Accepted connection"<<std::endl;
+      std::cout<<"Accepted connection\n"
   
 
       std::thread(&Server::handle_client,this,client_fd).detach();
