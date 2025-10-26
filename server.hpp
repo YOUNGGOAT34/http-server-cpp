@@ -77,11 +77,9 @@ class Server{
             
     public:
             Server(){}
-            void start_server(void);
+            void start_server(i8 *__directory) ;
 
 };
 
 void error(const i8 *message);
-
-
 #endif

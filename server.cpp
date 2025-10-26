@@ -123,7 +123,7 @@ ssize_t Server::echo_endpoint(string path,i32 client_fd){
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
-void Server::start_server(void){
+void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
    if(server_fd<0){
