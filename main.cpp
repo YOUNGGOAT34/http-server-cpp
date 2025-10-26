@@ -14,21 +14,19 @@ int main(i32 argc,i8 *argv[]){
    if(argc>1){
        for(int i=0;i<argc;i++){
            if(strcmp(argv[i],"--directory")==0){
-              directory=argv[i];
+              if(i+1<argc){
+
+                 directory=argv[i+1];
+              }else{
+                 error("Expected a directory name");
+              }
            }
        }
    }
 
-   if(directory){
-       std::cout<<"Not null\n";
-   }else{
-        std::cout<<"null\n";
-   }
-
-   return 0;
 
    Server server;
-   server.start_server();
+   server.start_server(directory);
 
    return 0;
 }

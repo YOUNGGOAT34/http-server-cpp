@@ -54,13 +54,20 @@ using vector=std::vector<T>;
 
 
 class Server{
+    //public enums and structs
     public:
          enum class STATUS:i32{
             OK=200,
             NOT_FOUND=404
          };
 
+         struct  CLIENT_ARGS{
+                i32 client_fd;
+                i8 *file_path;
+         };
+
     private:
+           //private members and methods
             string Version;
             STATUS Code;
             string body;
@@ -70,12 +77,15 @@ class Server{
             hashMap<string,string> extract_headers(i8 *buffer);
             ssize_t user_agent_endpoint(i32 client_fd,hashMap<string,string> headers);
             ssize_t echo_endpoint(string path,i32 client_fd);
+            ssize_t get_file_endpoint(i32 client_fd,string path);
             string status_code_to_string(Server::STATUS code);
-            void handle_client(i32 client_fd);
+            void handle_client(CLIENT_ARGS& client_args);
+
 
 
             
     public:
+            //public methods
             Server(){}
             void start_server(i8 *__directory) ;
 

@@ -28,6 +28,8 @@ string Server::status_code_to_string(Server::STATUS code){
 }
 
 
+//endpoint methods
+
 ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers){
 
    if(headers.find("User-Agent")==headers.end()){
@@ -36,6 +38,20 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers
 
    string res=response(STATUS::OK,headers["User-Agent"]);
    return send(client_fd,res.c_str(),res.size(),0);
+}
+
+
+ssize_t Server::echo_endpoint(string path,i32 client_fd){
+   string res=response(STATUS::OK,extract_request_body(path));
+   return send(client_fd,res.c_str(),res.size(),0);
+}
+
+
+
+ssize_t Server::get_file_endpoint(i32 client_fd,string path){
+   std::cout<<client_fd<<path<<"\n";
+   return 200;
+    
 }
 
 
@@ -118,13 +134,10 @@ hashMap<string,string> Server::extract_headers(i8 *buffer){
 
 
 
-ssize_t Server::echo_endpoint(string path,i32 client_fd){
-   string res=response(STATUS::OK,extract_request_body(path));
-   return send(client_fd,res.c_str(),res.size(),0);
-}
 
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
+
 
    if(server_fd<0){
       error("socket FD creation error");
@@ -158,17 +171,22 @@ void Server::start_server(i8 *__directory){
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
    while(1){
-
+     
       i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
    
       if(client_fd==-1){
           error("Failed to accept connection");
       }
+
+      CLIENT_ARGS client_args;
+
+      client_args.client_fd=client_fd;
+      client_args.file_path=__directory;
    
       std::cout<<"Accepted connection\n";
-  
 
-      std::thread(&Server::handle_client,this,client_fd).detach();
+      // std::thread(&Server::handle_client,this,client_args).detach();
+      handle_client(client_args);
         
    }
 
@@ -176,12 +194,12 @@ void Server::start_server(i8 *__directory){
    close(server_fd);
 }
 
-void Server::handle_client(i32 client_fd){
+void Server::handle_client(CLIENT_ARGS& client_args){
 
   
       i8 buffer[BUFFER_SIZE]={0};
    
-      ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
+      ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
       if(received_bytes<0){
            error("Error receiving client request");
       }
@@ -194,19 +212,24 @@ void Server::handle_client(i32 client_fd){
    
       if(path.starts_with("/echo/")){
    
-         bytes_sent=echo_endpoint(path,client_fd);
+         bytes_sent=echo_endpoint(path,client_args.client_fd);
       }else if(path.starts_with("/user-agent")){
           hashMap<string,string> headers=extract_headers(buffer);
-          bytes_sent=user_agent_endpoint(client_fd,headers);
+          bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
+      }else if(path.starts_with("/files/") && client_args.file_path){
+             string directory(client_args.file_path);
+             string file_name=path.substr(strlen("/files/"));
+             string full_path=directory+file_name;
+             std::cout<<full_path<<"\n";
       }
        
       if(bytes_sent==-1){
           error("Failed to send response to client");
       }
 
-      shutdown(client_fd,SHUT_WR);
+      shutdown(client_args.client_fd,SHUT_WR);
 
-      close(client_fd);
+      close(client_args.client_fd);
     
 }
 
@@ -216,7 +239,8 @@ string Server::response(STATUS status,const string& __body){
            "HTTP/1.1 {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
-           "\r\n",
+           "\r\n"
+           "{}",
            status_code_to_string(status),
            __body.size(),
            __body   
