@@ -19,8 +19,6 @@ string Server::status_code_to_string(Server::STATUS code){
     
 }
 
-
-
    string Server::extract_request_body(const string& path){
    ssize_t position=path.find_last_of('/');
    return path.substr(position+1);
@@ -48,34 +46,47 @@ ssize_t Server::echo_endpoint(string path,i32 client_fd){
 
 
 
-ssize_t Server::get_file_endpoint(i32 client_fd,string path){
-   std::cout<<client_fd<<path<<"\n";
-   return 200;
+ssize_t Server::get_file_endpoint(i32 client_fd,string& path){
+   size_t file_size;
+   i8 *buffer=read_file_contents(path,file_size);
+    
+   if(!buffer){
+          string res= response(STATUS::NOT_FOUND,"File Not Found");
+          return send(client_fd,res.c_str(),res.size(),0);
+   }
+   std::string body(buffer,file_size);
+   string res= response(STATUS::OK,body);
+   delete[] buffer;
+   return send(client_fd,res.c_str(),res.size(),0);
 }
 
 
-i8* Server::read_file_contents(string& path){
+i8* Server::read_file_contents(string& path,size_t& file_size){
    
    std::ifstream file(path,std::ios::in | std::ios::binary | std::ios::ate);
    
     if(!file.is_open()){
-       error("Failed to open the requested file");
+      return nullptr;
     }
 
-    size_t file_size=file.tellg();
+    file_size=file.tellg();
     file.seekg(0);
 
     i8 *buffer=new i8[file_size];
 
     file.read(buffer,file_size);
 
+    if(!file){
+       delete[] buffer;
+       return nullptr;
+    }
 
     return buffer;
 
 }
 
 
-   vector<string> Server::extract_request_line(i8 *buffer){
+vector<string> Server::extract_request_line(i8 *buffer){
    string request(buffer);
    std::istringstream raw_request_line(request);
    string request_line;
@@ -240,7 +251,7 @@ void Server::handle_client(CLIENT_ARGS& client_args){
              string directory(client_args.file_path);
              string file_name=path.substr(strlen("/files/"));
              string full_path=directory+file_name;
-             std::cout<<full_path<<"\n";
+             bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
       }
        
       if(bytes_sent==-1){
