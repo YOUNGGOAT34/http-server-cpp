@@ -14,6 +14,7 @@
 #include <vector>
 #include <variant>
 #include <unistd.h>
+#include<fstream>
 #include <thread>
 
 
@@ -78,6 +79,7 @@ class Server{
             ssize_t user_agent_endpoint(i32 client_fd,hashMap<string,string> headers);
             ssize_t echo_endpoint(string path,i32 client_fd);
             ssize_t get_file_endpoint(i32 client_fd,string path);
+            i8* read_file_contents(string &path);
             string status_code_to_string(Server::STATUS code);
             void handle_client(CLIENT_ARGS& client_args);
 

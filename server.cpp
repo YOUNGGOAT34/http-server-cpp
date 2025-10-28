@@ -51,7 +51,27 @@ ssize_t Server::echo_endpoint(string path,i32 client_fd){
 ssize_t Server::get_file_endpoint(i32 client_fd,string path){
    std::cout<<client_fd<<path<<"\n";
    return 200;
-    
+}
+
+
+i8* Server::read_file_contents(string& path){
+   
+   std::ifstream file(path,std::ios::in | std::ios::binary | std::ios::ate);
+   
+    if(!file.is_open()){
+       error("Failed to open the requested file");
+    }
+
+    size_t file_size=file.tellg();
+    file.seekg(0);
+
+    i8 *buffer=new i8[file_size];
+
+    file.read(buffer,file_size);
+
+
+    return buffer;
+
 }
 
 
