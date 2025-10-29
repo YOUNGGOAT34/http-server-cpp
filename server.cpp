@@ -19,7 +19,7 @@ string Server::status_code_to_string(Server::STATUS code){
     
 }
 
-   string Server::extract_request_body(const string& path){
+string Server::extract_request_body(const string& path){
    ssize_t position=path.find_last_of('/');
    return path.substr(position+1);
       
@@ -39,9 +39,13 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers
 }
 
 
-ssize_t Server::echo_endpoint(string path,i32 client_fd){
+ssize_t Server::echo_endpoint(string& path,i32 client_fd){
    string res=response(STATUS::OK,extract_request_body(path));
    return send(client_fd,res.c_str(),res.size(),0);
+}
+
+ssize_t Server::post_file_endpoint(){
+        
 }
 
 
@@ -58,6 +62,13 @@ ssize_t Server::get_file_endpoint(i32 client_fd,string& path){
    string res= response(STATUS::OK,body);
    delete[] buffer;
    return send(client_fd,res.c_str(),res.size(),0);
+}
+
+//read and write to a file in the server
+
+
+i8 *write_response_to_file(){
+     
 }
 
 
@@ -84,6 +95,13 @@ i8* Server::read_file_contents(string& path,size_t& file_size){
     return buffer;
 
 }
+
+/* 
+   Methods to:
+   Extracting the request line,
+   Extract request headers,
+   Extract request body
+*/
 
 
 vector<string> Server::extract_request_line(i8 *buffer){
@@ -164,6 +182,10 @@ hashMap<string,string> Server::extract_headers(i8 *buffer){
 }
 
 
+
+/*
+   Server starts from this point
+*/
 
 
 void Server::start_server(i8 *__directory){
