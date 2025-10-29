@@ -7,7 +7,7 @@ void error(const i8 *message){
    exit(EXIT_FAILURE);
 }
 
-string Server::status_code_to_string(Server::STATUS code){
+string Server::status_code_to_string(const Server::STATUS code){
    switch(code){
         case Server::STATUS::OK:
                return "200 OK";
@@ -28,7 +28,7 @@ string Server::extract_request_body(const string& path){
 
 //endpoint methods
 
-ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers){
+ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers){
 
    if(headers.find("User-Agent")==headers.end()){
        error("User-Agent not found in the headers");
@@ -39,18 +39,18 @@ ssize_t Server::user_agent_endpoint(i32 client_fd,hashMap<string,string> headers
 }
 
 
-ssize_t Server::echo_endpoint(string& path,i32 client_fd){
+ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    string res=response(STATUS::OK,extract_request_body(path));
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
-ssize_t Server::post_file_endpoint(){
-        
+ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd){
+        i8 *wrting_response=write_response_to_file(path);
 }
 
 
 
-ssize_t Server::get_file_endpoint(i32 client_fd,string& path){
+ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
    size_t file_size;
    i8 *buffer=read_file_contents(path,file_size);
     
@@ -67,12 +67,12 @@ ssize_t Server::get_file_endpoint(i32 client_fd,string& path){
 //read and write to a file in the server
 
 
-i8 *write_response_to_file(){
+i8 *write_response_to_file(const string &path){
      
 }
 
 
-i8* Server::read_file_contents(string& path,size_t& file_size){
+i8* Server::read_file_contents(const string& path,size_t& file_size){
    
    std::ifstream file(path,std::ios::in | std::ios::binary | std::ios::ate);
    
@@ -104,7 +104,7 @@ i8* Server::read_file_contents(string& path,size_t& file_size){
 */
 
 
-vector<string> Server::extract_request_line(i8 *buffer){
+vector<string> Server::extract_request_line(const i8 *buffer){
    string request(buffer);
    std::istringstream raw_request_line(request);
    string request_line;
@@ -123,7 +123,7 @@ vector<string> Server::extract_request_line(i8 *buffer){
 }
 
 
-hashMap<string,string> Server::extract_headers(i8 *buffer){
+hashMap<string,string> Server::extract_headers(const i8 *buffer){
        
       hashMap<string,string> headers;
        
@@ -188,7 +188,7 @@ hashMap<string,string> Server::extract_headers(i8 *buffer){
 */
 
 
-void Server::start_server(i8 *__directory){
+void Server::start_server(const i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
 
@@ -247,9 +247,12 @@ void Server::start_server(i8 *__directory){
    close(server_fd);
 }
 
-void Server::handle_client(CLIENT_ARGS& client_args){
+/*
+   All client requests will be handled here
+*/
 
-  
+void Server::handle_client(const CLIENT_ARGS& client_args){
+
       i8 buffer[BUFFER_SIZE]={0};
    
       ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
@@ -302,7 +305,7 @@ void Server::handle_client(CLIENT_ARGS& client_args){
     
 }
 
-string Server::response(STATUS status,const string& __body){
+string Server::response(const STATUS status,const string& __body){
       
       return std::format(
            "HTTP/1.1 {}\r\n"

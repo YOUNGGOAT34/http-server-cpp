@@ -75,14 +75,14 @@ class Server{
             string body;
             string response(STATUS status,const string& __body);
             string extract_request_body(const string& path );
-            vector<string> extract_request_line(i8 *buffer);
-            hashMap<string,string> extract_headers(i8 *buffer);
-            ssize_t user_agent_endpoint(i32 client_fd,hashMap<string,string> headers);
-            ssize_t echo_endpoint(string& path,i32 client_fd);
-            ssize_t get_file_endpoint(i32 client_fd,string& path);
-            i8* read_file_contents(string &path,size_t& file_size);
-            string status_code_to_string(Server::STATUS code);
-            void handle_client(CLIENT_ARGS& client_args);
+            vector<string> extract_request_line(const i8 *buffer);
+            hashMap<string,string> extract_headers(const i8 *buffer);
+            ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers);
+            ssize_t echo_endpoint(const string& path,const i32 client_fd);
+            ssize_t get_file_endpoint(const i32 client_fd,const string& path);
+            i8* read_file_contents(const string &path,size_t& file_size);
+            string status_code_to_string(const Server::STATUS code);
+            void handle_client(const CLIENT_ARGS& client_args);
 
 
 
@@ -90,7 +90,7 @@ class Server{
     public:
             //public methods
             Server(){}
-            void start_server(i8 *__directory) ;
+            void start_server(const i8 *__directory) ;
 
 };
 
