@@ -19,10 +19,27 @@ string Server::status_code_to_string(const Server::STATUS code){
     
 }
 
-string Server::extract_request_body(const string& path){
+
+/*
+   When used for the echo endpoint 
+   /echo/body
+   supposed to return the {body}
+*/
+
+string Server::extract_request_body_from_path(const string& path){
    ssize_t position=path.find_last_of('/');
    return path.substr(position+1);
-      
+}
+
+/*
+  Extracting the request body from the request buffer
+*/
+
+sting Server::exract_request_body(const string& request){
+        size_t pos=request.find("\r\n\r\n");
+        if(pos==std::string::npos) return "";
+
+        return request.substr(pos+4);
 }
 
 
@@ -40,12 +57,22 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
 
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
-   string res=response(STATUS::OK,extract_request_body(path));
+   string res=response(STATUS::OK,extract_request_body_from_path(path));
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd){
         i8 *wrting_response=write_response_to_file(path);
+        string res;
+        if(!wrting_response){
+             res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+             return send(client_fd,res.cstr(),res.size(),0);
+        }
+
+
+        res=response(STATUS::OK,"Internal Server Error");
+        return send(client_fd,res.cstr(),res.size(),0);
+        
 }
 
 
@@ -67,8 +94,8 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
 //read and write to a file in the server
 
 
-i8 *write_response_to_file(const string &path){
-     
+i8 *write_response_to_file(const string &path,const string& body){
+      
 }
 
 
@@ -169,7 +196,6 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
             }else{
                value.clear();
             }
-
 
             headers[key]=value;
 

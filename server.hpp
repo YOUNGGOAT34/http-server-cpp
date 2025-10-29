@@ -60,7 +60,9 @@ class Server{
          enum class STATUS:i32{
             OK=200,
             NOT_FOUND=404,
-            CREATED=201
+            CREATED=201,
+            INTERNAL_SERVER_ERROR=500,
+            BAD_REQUEST=400
          };
 
          struct  CLIENT_ARGS{
@@ -74,12 +76,13 @@ class Server{
             STATUS Code;
             string body;
             string response(STATUS status,const string& __body);
-            string extract_request_body(const string& path );
+            string extract_request_body_from_path(const string& path );
             vector<string> extract_request_line(const i8 *buffer);
             hashMap<string,string> extract_headers(const i8 *buffer);
             ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers);
             ssize_t echo_endpoint(const string& path,const i32 client_fd);
             ssize_t get_file_endpoint(const i32 client_fd,const string& path);
+            ssize_t post_file_endpoint(const string& path,const i32 client_fd);
             i8* read_file_contents(const string &path,size_t& file_size);
             string status_code_to_string(const Server::STATUS code);
             void handle_client(const CLIENT_ARGS& client_args);
