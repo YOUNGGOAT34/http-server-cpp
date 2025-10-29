@@ -59,7 +59,8 @@ class Server{
     public:
          enum class STATUS:i32{
             OK=200,
-            NOT_FOUND=404
+            NOT_FOUND=404,
+            CREATED=201
          };
 
          struct  CLIENT_ARGS{
