@@ -259,7 +259,18 @@ void Server::handle_client(CLIENT_ARGS& client_args){
       buffer[received_bytes]='\0';
       
       vector<string> request_line=extract_request_line(buffer);
+
+      /*
+        The above vector contains :
+        Request method at the first index:[0]
+        Request path at the second index:[1]
+        HTTP version at the third index:[2]
+
+       */
+
       string path=request_line[1];
+      string METHOD=request_line[0];
+
      
       ssize_t bytes_sent;
    
@@ -270,10 +281,15 @@ void Server::handle_client(CLIENT_ARGS& client_args){
           hashMap<string,string> headers=extract_headers(buffer);
           bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
       }else if(path.starts_with("/files/") && client_args.file_path){
-             string directory(client_args.file_path);
-             string file_name=path.substr(strlen("/files/"));
-             string full_path=directory+file_name;
-             bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
+             if(METHOD=="GET"){
+
+                string directory(client_args.file_path);
+                string file_name=path.substr(strlen("/files/"));
+                string full_path=directory+file_name;
+                bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
+             }else if(METHOD=="POST"){
+                 
+             }
       }
        
       if(bytes_sent==-1){
