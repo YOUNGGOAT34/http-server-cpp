@@ -15,6 +15,7 @@
 #include <variant>
 #include <unistd.h>
 #include<fstream>
+#include<filesystem>
 #include <thread>
 
 
@@ -77,6 +78,7 @@ class Server{
             string body;
             string response(STATUS status,const string& __body);
             string extract_request_body_from_path(const string& path );
+            string extract_request_body(const string& request);
             vector<string> extract_request_line(const i8 *buffer);
             hashMap<string,string> extract_headers(const i8 *buffer);
             ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers);
@@ -93,7 +95,7 @@ class Server{
     public:
             //public methods
             Server(){}
-            void start_server(const i8 *__directory) ;
+            void start_server(i8 *__directory) ;
 
 };
 

@@ -35,13 +35,12 @@ string Server::extract_request_body_from_path(const string& path){
   Extracting the request body from the request buffer
 */
 
-sting Server::exract_request_body(const string& request){
+string Server::extract_request_body(const string& request){
         size_t pos=request.find("\r\n\r\n");
         if(pos==std::string::npos) return "";
 
         return request.substr(pos+4);
 }
-
 
 //endpoint methods
 
@@ -50,8 +49,9 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
    if(headers.find("User-Agent")==headers.end()){
        error("User-Agent not found in the headers");
    }
-
-   string res=response(STATUS::OK,headers["User-Agent"]);
+   
+   
+   string res=response(STATUS::OK,headers.at("User-Agent"));
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
@@ -62,16 +62,16 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
 }
 
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd){
-        i8 *wrting_response=write_response_to_file(path);
+      //   i8 *wrting_response=write_response_to_file(path);
         string res;
-        if(!wrting_response){
-             res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
-             return send(client_fd,res.cstr(),res.size(),0);
-        }
+      //   if(!wrting_response){
+      //        res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+      //        return send(client_fd,res.c_str(),res.size(),0);
+      //   }
 
 
         res=response(STATUS::OK,"Internal Server Error");
-        return send(client_fd,res.cstr(),res.size(),0);
+        return send(client_fd,res.c_str(),res.size(),0);
         
 }
 
@@ -94,8 +94,11 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
 //read and write to a file in the server
 
 
+
 i8 *write_response_to_file(const string &path,const string& body){
+     std::filesystem::path __path(path);
       
+      return nullptr;
 }
 
 
@@ -214,7 +217,7 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 */
 
 
-void Server::start_server(const i8 *__directory){
+void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
 
