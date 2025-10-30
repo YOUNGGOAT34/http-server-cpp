@@ -61,16 +61,17 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
-ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd){
-      //   i8 *wrting_response=write_response_to_file(path);
+ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string body){
+        const i8 *wrting_response=write_response_to_file(path,body);
         string res;
-      //   if(!wrting_response){
-      //        res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
-      //        return send(client_fd,res.c_str(),res.size(),0);
-      //   }
+
+        if(!wrting_response){
+             res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+             return send(client_fd,res.c_str(),res.size(),0);
+        }
 
 
-        res=response(STATUS::OK,"Internal Server Error");
+        res=response(STATUS::OK,"Created successfully");
         return send(client_fd,res.c_str(),res.size(),0);
         
 }
@@ -95,10 +96,34 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
 
 
 
-i8 *write_response_to_file(const string &path,const string& body){
+const i8*  Server::write_response_to_file(const string &path,string& body){
      std::filesystem::path __path(path);
-      
+
+     if(!std::filesystem::exists(__path)){
+       
+      std::filesystem::create_directories(__path);
+     }
+
+     std::filesystem::path file_path=__path;
+
+     if(!file_path.has_filename()){
+      //   error("Invalid file path");
       return nullptr;
+     }
+
+     std::ofstream file(file_path,std::ios::binary);
+     
+     if(!file.is_open()){
+        return nullptr;
+     }
+
+     file.write(body.c_str(),body.size());
+     file.close();
+      
+
+      
+
+      return "ok";
 }
 
 
@@ -305,6 +330,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
 
      
       ssize_t bytes_sent;
+
    
       if(path.starts_with("/echo/")){
    
@@ -320,7 +346,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
                 string full_path=directory+file_name;
                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
              }else if(METHOD=="POST"){
-                 
+                 string body=extract_request_body(buffer);
+                 bytes_sent=post_file_endpoint(path,client_args.client_fd,body);
              }
       }
        
