@@ -85,6 +85,7 @@ class Server{
             ssize_t echo_endpoint(const string& path,const i32 client_fd);
             ssize_t get_file_endpoint(const i32 client_fd,const string& path);
             ssize_t post_file_endpoint(const string& path,const i32 client_fd,string body);
+            ssize_t internal_server_error(i32 client_fd);
             i8* read_file_contents(const string &path,size_t& file_size);
             const i8* write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);

@@ -4,7 +4,7 @@
 
 void error(const i8 *message){
    std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
-   exit(EXIT_FAILURE);
+   // exit(EXIT_FAILURE);
 }
 
 string Server::status_code_to_string(const Server::STATUS code){
@@ -13,12 +13,13 @@ string Server::status_code_to_string(const Server::STATUS code){
                return "200 OK";
         case Server::STATUS::NOT_FOUND:
                return "404 NOT FOUND";
+        case Server::STATUS::INTERNAL_SERVER_ERROR:
+               return "500 INTERNAL SERVER ERROR";
         default: return "500 Unknown";
 
    }
     
 }
-
 
 /*
    When used for the echo endpoint 
@@ -50,7 +51,6 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
        error("User-Agent not found in the headers");
    }
    
-   
    string res=response(STATUS::OK,headers.at("User-Agent"));
    return send(client_fd,res.c_str(),res.size(),0);
 }
@@ -66,10 +66,8 @@ ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string
         string res;
 
         if(!wrting_response){
-             res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
-             return send(client_fd,res.c_str(),res.size(),0);
+             return internal_server_error(client_fd);
         }
-
 
         res=response(STATUS::OK,"Created successfully");
         return send(client_fd,res.c_str(),res.size(),0);
@@ -249,12 +247,14 @@ void Server::start_server(i8 *__directory){
 
    if(server_fd<0){
       error("socket FD creation error");
+      exit(EXIT_FAILURE);
    }
    
    i32 reuse=1;
 
    if(setsockopt(server_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse))<0){
       error("Setting the address to be reusable failed");
+      exit(EXIT_FAILURE);
    }
 
    SA server_address;
@@ -265,11 +265,13 @@ void Server::start_server(i8 *__directory){
 
    if(bind(server_fd,(const struct sockaddr *)&server_address,sizeof(server_address))!=0){
        error("Failed to bind the server file descriptor to this address");
+       exit(EXIT_FAILURE);
    }
 
    i32 connection_backlog=50;
    if(listen(server_fd,connection_backlog)!=0){
        error("Failed to listen on PORT 4221");
+       exit(EXIT_FAILURE);
    }
 
    
@@ -284,6 +286,7 @@ void Server::start_server(i8 *__directory){
    
       if(client_fd==-1){
           error("Failed to accept connection");
+          continue;
       }
 
       CLIENT_ARGS client_args;
@@ -313,6 +316,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
       if(received_bytes<0){
            error("Error receiving client request");
+           return;
       }
       buffer[received_bytes]='\0';
       
@@ -353,6 +357,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
        
       if(bytes_sent==-1){
           error("Failed to send response to client");
+          return;
       }
 
       shutdown(client_args.client_fd,SHUT_WR);
@@ -360,6 +365,16 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       close(client_args.client_fd);
     
 }
+
+/*
+  Responses 
+*/
+
+ssize_t Server::internal_server_error(i32 client_fd){
+             string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+             return send(client_fd,res.c_str(),res.size(),0);
+}
+
 
 string Server::response(const STATUS status,const string& __body){
       
