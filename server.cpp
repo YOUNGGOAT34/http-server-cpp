@@ -333,9 +333,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       string path=request_line[1];
       string METHOD=request_line[0];
 
-     
       ssize_t bytes_sent;
-
    
       if(path.starts_with("/echo/")){
    
