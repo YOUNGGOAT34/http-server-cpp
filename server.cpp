@@ -16,7 +16,6 @@ string Server::status_code_to_string(const Server::STATUS code){
         case Server::STATUS::INTERNAL_SERVER_ERROR:
                return "500 INTERNAL SERVER ERROR";
         default: return "500 Unknown";
-
    }
     
 }
@@ -90,14 +89,29 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
+ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
+      std::filesystem::path file_path(path);
+      string res;
+      if(std::filesystem::remove(file_path)){
+           res=response(STATUS::OK,"Deleted successfully");
+           return send(client_fd,res.c_str(),res.size(),0);
+      }else{
+           res=response(STATUS::NOT_FOUND,"Not Found");
+           return send(client_fd,res.c_str(),res.size(),0);
+      }
+
+      res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+      return send(client_fd,res.c_str(),res.size(),0);
+
+}
+
 //read and write to a file in the server
-
-
 
 const i8*  Server::write_response_to_file(const string &path,string& body){
      std::filesystem::path f_path(path);
      
      std::filesystem::path parent_dir=f_path.parent_path();
+
      if(!std::filesystem::exists(parent_dir)){
        
       std::filesystem::create_directories(parent_dir);
@@ -350,6 +364,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
              }else if(METHOD=="POST"){
                  string body=extract_request_body(buffer);
                  bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
+             }else if(METHOD=="DELETE"){
+                 bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
              }
       }
        
@@ -368,7 +384,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
   Responses 
 */
 
-ssize_t Server::internal_server_error(i32 client_fd){
+ssize_t Server::internal_server_error(const i32 client_fd){
              string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
              return send(client_fd,res.c_str(),res.size(),0);
 }
