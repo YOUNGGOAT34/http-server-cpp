@@ -97,21 +97,22 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
 
 
 const i8*  Server::write_response_to_file(const string &path,string& body){
-     std::filesystem::path __path(path);
-
-     if(!std::filesystem::exists(__path)){
+     std::filesystem::path f_path(path);
+     
+     std::filesystem::path parent_dir=f_path.parent_path();
+     if(!std::filesystem::exists(parent_dir)){
        
-      std::filesystem::create_directories(__path);
+      std::filesystem::create_directories(parent_dir);
      }
 
-     std::filesystem::path file_path=__path;
+   
 
-     if(!file_path.has_filename()){
+     if(!parent_dir.has_filename()){
       //   error("Invalid file path");
       return nullptr;
      }
 
-     std::ofstream file(file_path,std::ios::binary);
+     std::ofstream file(f_path,std::ios::binary);
      
      if(!file.is_open()){
         return nullptr;
@@ -339,15 +340,14 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
           hashMap<string,string> headers=extract_headers(buffer);
           bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
       }else if(path.starts_with("/files/") && client_args.file_path){
+              string directory(client_args.file_path);
+              string file_name=path.substr(strlen("/files/"));
+               string full_path=directory+file_name;
              if(METHOD=="GET"){
-
-                string directory(client_args.file_path);
-                string file_name=path.substr(strlen("/files/"));
-                string full_path=directory+file_name;
                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
              }else if(METHOD=="POST"){
                  string body=extract_request_body(buffer);
-                 bytes_sent=post_file_endpoint(path,client_args.client_fd,body);
+                 bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
              }
       }
        
