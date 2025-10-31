@@ -62,6 +62,7 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
+
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body){
         const i8 *wrting_response=write_response_to_file(path,body);
         string res;
@@ -121,6 +122,27 @@ ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string&
    
 }
 
+ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 client_fd){
+      std::filesystem::path file_path(path);
+
+      if(!std::filesystem::exists(file_path)){
+           return not_found(client_fd);
+      }
+
+      std::ofstream file(file_path,std::ios::binary | std::ios::app);
+
+      if(!file.is_open()){
+          return internal_server_error(client_fd);
+      }
+
+      file<<body;
+
+      file.close();
+
+      string res=response(STATUS::OK,"File updated successfully");
+      return send(client_fd,res.c_str(),res.size(),0);
+}
+
 ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
       std::filesystem::path file_path(path);
       string res;
@@ -138,7 +160,6 @@ ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
 }
 
 //read and write to a file in the server
-
 const i8*  Server::write_response_to_file(const string &path,string& body){
      std::filesystem::path f_path(path);
      
@@ -401,6 +422,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
                  bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
              }else if(METHOD=="PUT"){
                   bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body);
+             }else if(METHOD=="PATCH"){
+                  bytes_sent=patch_file_endpoint(body,full_path,client_args.client_fd);
              }
       }
 
@@ -424,6 +447,12 @@ ssize_t Server::internal_server_error(const i32 client_fd){
              string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
              return send(client_fd,res.c_str(),res.size(),0);
 }
+
+
+ ssize_t Server::not_found(const i32 client_fd){
+             string res=response(STATUS::NOT_FOUND,"Not Found");
+             return send(client_fd,res.c_str(),res.size(),0);
+ }
 
 
 string Server::response(const STATUS status,const string& __body){
