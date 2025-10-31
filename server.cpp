@@ -60,7 +60,7 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    return send(client_fd,res.c_str(),res.size(),0);
 }
 
-ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string body){
+ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body){
         const i8 *wrting_response=write_response_to_file(path,body);
         string res;
 
@@ -87,6 +87,36 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
    string res= response(STATUS::OK,body);
    delete[] buffer;
    return send(client_fd,res.c_str(),res.size(),0);
+}
+
+
+ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string& body){
+    std::filesystem::path file_path(path);
+    
+    bool file_exists=std::filesystem::exists(file_path);
+
+    std::filesystem::path parent_directory=file_path.parent_path();
+
+    if(!std::filesystem::exists(parent_directory))
+            std::filesystem::create_directories(parent_directory);
+
+    std::ofstream file(file_path,std::ios::binary | std::ios::trunc);
+
+    if(!file.is_open())
+         return internal_server_error(client_fd);
+
+    file.write(body.c_str(),body.size());
+    file.close();
+
+    string res;
+    if(file_exists){
+       res=response(STATUS::OK,"File replaced successfully");
+    }else{
+       res=response(STATUS::OK,"File created successully");
+    }
+
+    return send(client_fd,res.c_str(),body.size(),0);
+   
 }
 
 ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
@@ -358,7 +388,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       }else if(path.starts_with("/files/") && client_args.file_path){
               string directory(client_args.file_path);
               string file_name=path.substr(strlen("/files/"));
-               string full_path=directory+file_name;
+              string full_path=directory+file_name;
              if(METHOD=="GET"){
                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
              }else if(METHOD=="POST"){
@@ -366,8 +396,11 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
                  bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
              }else if(METHOD=="DELETE"){
                  bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
+             }else if(METHOD=="PUT"){
+                  bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body);
              }
       }
+
        
       if(bytes_sent==-1){
           error("Failed to send response to client");

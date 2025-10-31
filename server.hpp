@@ -84,7 +84,8 @@ class Server{
             ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers);
             ssize_t echo_endpoint(const string& path,const i32 client_fd);
             ssize_t get_file_endpoint(const i32 client_fd,const string& path);
-            ssize_t post_file_endpoint(const string& path,const i32 client_fd,string body);
+            ssize_t post_file_endpoint(const string& path,const i32 client_fd,string& body);
+            ssize_t put_file_endpoint(const string& full_path,const i32 client_fd,string& body);
             ssize_t delete_file_endpoint(const i32 client_fd,const string& path);
             ssize_t internal_server_error(const i32 client_fd);
             i8* read_file_contents(const string &path,size_t& file_size);
