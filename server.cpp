@@ -11,6 +11,8 @@ string Server::status_code_to_string(const Server::STATUS code){
    switch(code){
         case Server::STATUS::OK:
                return "200 OK";
+        case Server::STATUS::CREATED:
+               return "201 CREATED";
         case Server::STATUS::NOT_FOUND:
                return "404 NOT FOUND";
         case Server::STATUS::INTERNAL_SERVER_ERROR:
@@ -112,10 +114,10 @@ ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string&
     if(file_exists){
        res=response(STATUS::OK,"File replaced successfully");
     }else{
-       res=response(STATUS::OK,"File created successully");
+       res=response(STATUS::CREATED,"File created successully");
     }
 
-    return send(client_fd,res.c_str(),body.size(),0);
+    return send(client_fd,res.c_str(),res.size(),0);
    
 }
 
@@ -162,8 +164,6 @@ const i8*  Server::write_response_to_file(const string &path,string& body){
 
      file.write(body.c_str(),body.size());
      file.close();
-      
-
       
 
       return "ok";
@@ -386,13 +386,16 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
           hashMap<string,string> headers=extract_headers(buffer);
           bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
       }else if(path.starts_with("/files/") && client_args.file_path){
+
+              string body=extract_request_body(buffer);
+
               string directory(client_args.file_path);
               string file_name=path.substr(strlen("/files/"));
               string full_path=directory+file_name;
              if(METHOD=="GET"){
                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
              }else if(METHOD=="POST"){
-                 string body=extract_request_body(buffer);
+                 
                  bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
              }else if(METHOD=="DELETE"){
                  bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
