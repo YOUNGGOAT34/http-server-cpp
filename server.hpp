@@ -17,6 +17,7 @@
 #include<fstream>
 #include<filesystem>
 #include <thread>
+#include "exceptions.hpp"
 
 
 
@@ -43,7 +44,7 @@ using u8= unsigned char;
 using u16=unsigned short int;
 using u32= unsigned int;
 using u64=unsigned long int;
-using string=std::string;
+
 
 template<typename K,typename V>
 using hashMap=std::unordered_map<K,V>;
@@ -91,7 +92,7 @@ class Server{
             ssize_t not_found(const i32 client_fd);
             ssize_t internal_server_error(const i32 client_fd);
             i8* read_file_contents(const string &path,size_t& file_size);
-            const i8* write_response_to_file(const string &path,string& body);
+            void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
             void handle_client(const CLIENT_ARGS& client_args);
 

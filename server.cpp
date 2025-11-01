@@ -64,32 +64,29 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
 
 
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body){
-        const i8 *wrting_response=write_response_to_file(path,body);
-        string res;
+       
 
-        if(!wrting_response){
-             return internal_server_error(client_fd);
-        }
+           write_response_to_file(path,body);
+           string res=response(STATUS::OK,"Created successfully");
+           return send(client_fd,res.c_str(),res.size(),0);
 
-        res=response(STATUS::OK,"Created successfully");
-        return send(client_fd,res.c_str(),res.size(),0);
         
 }
 
 
 
 ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
-   size_t file_size;
-   i8 *buffer=read_file_contents(path,file_size);
-    
-   if(!buffer){
-          string res= response(STATUS::NOT_FOUND,"File Not Found");
-          return send(client_fd,res.c_str(),res.size(),0);
-   }
-   std::string body(buffer,file_size);
-   string res= response(STATUS::OK,body);
-   delete[] buffer;
-   return send(client_fd,res.c_str(),res.size(),0);
+   
+
+      size_t file_size;
+      i8 *buffer=read_file_contents(path,file_size);
+       
+      std::string body(buffer,file_size);
+      string res= response(STATUS::OK,body);
+      delete[] buffer;
+      return send(client_fd,res.c_str(),res.size(),0);
+
+
 }
 
 
@@ -106,7 +103,7 @@ ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string&
     std::ofstream file(file_path,std::ios::binary | std::ios::trunc);
 
     if(!file.is_open())
-         return internal_server_error(client_fd);
+         throw FileIOException("Failed to open file: "+path);
 
     file.write(body.c_str(),body.size());
     file.close();
@@ -126,13 +123,13 @@ ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 cl
       std::filesystem::path file_path(path);
 
       if(!std::filesystem::exists(file_path)){
-           return not_found(client_fd);
+           throw FileIOException("File not found: "+path);
       }
 
       std::ofstream file(file_path,std::ios::binary | std::ios::app);
 
       if(!file.is_open()){
-          return internal_server_error(client_fd);
+          throw FileIOException("Failed to open file: "+path);
       }
 
       file<<body;
@@ -160,7 +157,7 @@ ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
 }
 
 //read and write to a file in the server
-const i8*  Server::write_response_to_file(const string &path,string& body){
+ void  Server::write_response_to_file(const string &path,string& body){
      std::filesystem::path f_path(path);
      
      std::filesystem::path parent_dir=f_path.parent_path();
@@ -173,21 +170,18 @@ const i8*  Server::write_response_to_file(const string &path,string& body){
    
 
      if(!parent_dir.has_filename()){
-      //   error("Invalid file path");
-      return nullptr;
+        throw FileIOException("Invalid path from the client: "+path);
      }
 
      std::ofstream file(f_path,std::ios::binary);
      
      if(!file.is_open()){
-        return nullptr;
+        throw FileIOException("Failed to open file: "+path);
      }
 
      file.write(body.c_str(),body.size());
      file.close();
       
-
-      return "ok";
 }
 
 
@@ -196,7 +190,7 @@ i8* Server::read_file_contents(const string& path,size_t& file_size){
    std::ifstream file(path,std::ios::in | std::ios::binary | std::ios::ate);
    
     if(!file.is_open()){
-      return nullptr;
+      throw FileIOException("Failed to open file : "+path);
     }
 
     file_size=file.tellg();
@@ -208,7 +202,7 @@ i8* Server::read_file_contents(const string& path,size_t& file_size){
 
     if(!file){
        delete[] buffer;
-       return nullptr;
+       throw FileIOException("Failed to read the file: "+path);
     }
 
     return buffer;
@@ -376,66 +370,93 @@ void Server::start_server(i8 *__directory){
 
 void Server::handle_client(const CLIENT_ARGS& client_args){
 
-      i8 buffer[BUFFER_SIZE]={0};
-   
-      ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
-      if(received_bytes<0){
-           error("Error receiving client request");
-           return;
-      }
-      buffer[received_bytes]='\0';
-      
-      vector<string> request_line=extract_request_line(buffer);
 
-      /*
-        The above vector contains :
-        Request method at the first index:[0]
-        Request path at the second index:[1]
-        HTTP version at the third index:[2]
+    try{
 
-       */
-
-      string path=request_line[1];
-      string METHOD=request_line[0];
-
-      ssize_t bytes_sent;
-   
-      if(path.starts_with("/echo/")){
-   
-         bytes_sent=echo_endpoint(path,client_args.client_fd);
-      }else if(path.starts_with("/user-agent")){
-          hashMap<string,string> headers=extract_headers(buffer);
-          bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
-      }else if(path.starts_with("/files/") && client_args.file_path){
-
-              string body=extract_request_body(buffer);
-
-              string directory(client_args.file_path);
-              string file_name=path.substr(strlen("/files/"));
-              string full_path=directory+file_name;
-             if(METHOD=="GET"){
-                bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
-             }else if(METHOD=="POST"){
-                 
-                 bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
-             }else if(METHOD=="DELETE"){
-                 bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
-             }else if(METHOD=="PUT"){
-                  bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body);
-             }else if(METHOD=="PATCH"){
-                  bytes_sent=patch_file_endpoint(body,full_path,client_args.client_fd);
-             }
-      }
-
+       i8 buffer[BUFFER_SIZE]={0};
+    
+       ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
+       if(received_bytes<0){
+            throw NetworkException("Error receivin client request");
+       }
+       buffer[received_bytes]='\0';
        
-      if(bytes_sent==-1){
-          error("Failed to send response to client");
-          return;
-      }
+       vector<string> request_line=extract_request_line(buffer);
+ 
+       /*
+         The above vector contains :
+         Request method at the first index:[0]
+         Request path at the second index:[1]
+         HTTP version at the third index:[2]
+ 
+        */
+ 
+       string path=request_line[1];
+       string METHOD=request_line[0];
+ 
+       ssize_t bytes_sent;
+    
+       if(path.starts_with("/echo/")){
+    
+          bytes_sent=echo_endpoint(path,client_args.client_fd);
+       }else if(path.starts_with("/user-agent")){
+           hashMap<string,string> headers=extract_headers(buffer);
+           bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
+       }else if(path.starts_with("/files/") && client_args.file_path){
+ 
+               string body=extract_request_body(buffer);
+ 
+               string directory(client_args.file_path);
+               string file_name=path.substr(strlen("/files/"));
+               string full_path=directory+file_name;
+              if(METHOD=="GET"){
+                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
+              }else if(METHOD=="POST"){
+                  
+                  bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
+              }else if(METHOD=="DELETE"){
+                  bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
+              }else if(METHOD=="PUT"){
+                   bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body);
+              }else if(METHOD=="PATCH"){
+                   bytes_sent=patch_file_endpoint(body,full_path,client_args.client_fd);
+              }
+       }
+ 
+        
+       if(bytes_sent==-1){
+          throw ServerException("Error sending response");
+       }
+ 
+       shutdown(client_args.client_fd,SHUT_WR);
+ 
+       close(client_args.client_fd);
+    }catch(const ServerException& e){
+        std::cerr<<RED<<e.what()<<RESET<<"\n";
+        internal_server_error(client_args.client_fd);
+        close(client_args.client_fd);
+    }catch(const NetworkException& e){
+        std::cerr<<RED<<e.what()<<RESET<<"\n";
+        internal_server_error(client_args.client_fd);
+        close(client_args.client_fd);
+   }catch(const FileIOException& e){
+         string __error=e.what();
+         std::cerr<<RED<<__error<<RESET<<"\n";
+       
+         if(__error.find("Invalid path")!=std::string::npos || __error.find("not found")!=std::string::npos){
+                      not_found(client_args.client_fd);
+         }else{
+              internal_server_error(client_args.client_fd);
+         }
 
-      shutdown(client_args.client_fd,SHUT_WR);
+         close(client_args.client_fd);
 
-      close(client_args.client_fd);
+
+   }catch(...){
+        std::cerr<<RED<<"Unhandled exception"<<RESET<<"\n";
+        internal_server_error(client_args.client_fd);
+        close(client_args.client_fd);
+    }
     
 }
 
