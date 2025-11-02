@@ -82,7 +82,7 @@ class Server{
             string extract_request_body(const string& request);
             vector<string> extract_request_line(const i8 *buffer);
             hashMap<string,string> extract_headers(const i8 *buffer);
-            ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers);
+            ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers);
             ssize_t echo_endpoint(const string& path,const i32 client_fd);
             ssize_t get_file_endpoint(const i32 client_fd,const string& path);
             ssize_t post_file_endpoint(const string& path,const i32 client_fd,string& body);

@@ -46,7 +46,7 @@ string Server::extract_request_body(const string& request){
 
 //endpoint methods
 
-ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string> headers){
+ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers){
 
    if(headers.find("User-Agent")==headers.end()){
        error("User-Agent not found in the headers");
