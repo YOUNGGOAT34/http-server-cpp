@@ -65,11 +65,9 @@ ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
 
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body){
        
-
            write_response_to_file(path,body);
            string res=response(STATUS::OK,"Created successfully");
            return send(client_fd,res.c_str(),res.size(),0);
-
         
 }
 
