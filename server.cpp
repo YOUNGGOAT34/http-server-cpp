@@ -301,42 +301,44 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
-
+   
    if(server_fd<0){
       error("socket FD creation error");
       exit(EXIT_FAILURE);
    }
    
    i32 reuse=1;
-
+   
    if(setsockopt(server_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse))<0){
       error("Setting the address to be reusable failed");
       exit(EXIT_FAILURE);
    }
-
+   
    SA server_address;
-
+   
    server_address.sin_family=AF_INET;
    server_address.sin_addr.s_addr=INADDR_ANY;
    server_address.sin_port=htons(PORT);
-
+   
    if(bind(server_fd,(const struct sockaddr *)&server_address,sizeof(server_address))!=0){
-       error("Failed to bind the server file descriptor to this address");
-       exit(EXIT_FAILURE);
+      error("Failed to bind the server file descriptor to this address");
+      exit(EXIT_FAILURE);
    }
-
+   
    i32 connection_backlog=50;
    if(listen(server_fd,connection_backlog)!=0){
-       error("Failed to listen on PORT 4221");
-       exit(EXIT_FAILURE);
+      error("Failed to listen on PORT 4221");
+      exit(EXIT_FAILURE);
    }
-
+   
    
    SA client_address;
    socklen_t client_address_size=sizeof(client_address);
    
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
+ 
+   
    while(1){
      
       i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
@@ -353,8 +355,8 @@ void Server::start_server(i8 *__directory){
    
       std::cout<<"Accepted connection\n";
 
-      // std::thread(&Server::handle_client,this,client_args).detach();
-      handle_client(client_args);
+      thread_pool.enqueue(client_args);
+      // handle_client(client_args);
         
    }
 
