@@ -53,13 +53,13 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
    }
    
    string res=response(STATUS::OK,headers.at("User-Agent"));
-   return send(client_fd,res.c_str(),res.size(),0);
+   return send_all(client_fd,res.c_str(),res.size());
 }
 
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    string res=response(STATUS::OK,extract_request_body_from_path(path));
-   return send(client_fd,res.c_str(),res.size(),0);
+   return send_all(client_fd,res.c_str(),res.size());
 }
 
 
@@ -67,7 +67,7 @@ ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string
        
            write_response_to_file(path,body);
            string res=response(STATUS::OK,"Created successfully");
-           return send(client_fd,res.c_str(),res.size(),0);
+           return send_all(client_fd,res.c_str(),res.size());
         
 }
 
@@ -82,7 +82,7 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
       std::string body(buffer,file_size);
       string res= response(STATUS::OK,body);
       delete[] buffer;
-      return send(client_fd,res.c_str(),res.size(),0);
+      return send_all(client_fd,res.c_str(),res.size());
 
 
 }
@@ -113,7 +113,7 @@ ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string&
        res=response(STATUS::CREATED,"File created successully");
     }
 
-    return send(client_fd,res.c_str(),res.size(),0);
+    return send_all(client_fd,res.c_str(),res.size());
    
 }
 
@@ -135,7 +135,7 @@ ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 cl
       file.close();
 
       string res=response(STATUS::OK,"File updated successfully");
-      return send(client_fd,res.c_str(),res.size(),0);
+      return send_all(client_fd,res.c_str(),res.size());
 }
 
 ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
@@ -143,14 +143,14 @@ ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
       string res;
       if(std::filesystem::remove(file_path)){
            res=response(STATUS::OK,"Deleted successfully");
-           return send(client_fd,res.c_str(),res.size(),0);
+           return send_all(client_fd,res.c_str(),res.size());
       }else{
            res=response(STATUS::NOT_FOUND,"Not Found");
-           return send(client_fd,res.c_str(),res.size(),0);
+           return send_all(client_fd,res.c_str(),res.size());
       }
 
       res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
-      return send(client_fd,res.c_str(),res.size(),0);
+      return send_all(client_fd,res.c_str(),res.size());
 
 }
 
@@ -301,6 +301,8 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
 
+   i32 flags=fcntl(server_fd,F_GETFL,0);
+   fcntl(server_fd,F_SETFL,flags | O_NONBLOCK);
    
    if(server_fd<0){
       error("socket FD creation error");
@@ -338,26 +340,67 @@ void Server::start_server(i8 *__directory){
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
  
+   fd_set readfds,masterfds;
+   FD_ZERO(&masterfds);
+   FD_SET(server_fd,&masterfds);
+   i32 max_fd=server_fd;
+
    
    while(1){
+      
+       readfds=masterfds;    
+  
      
-      i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
-   
-      if(client_fd==-1){
-          error("Failed to accept connection");
-          continue;
+       
+      i32 socket_activiy=select(max_fd+1,&readfds,nullptr,nullptr,nullptr);
+
+      if(socket_activiy<0){
+           error("Select failed");
+           continue;
       }
 
-      CLIENT_ARGS client_args;
 
-      client_args.client_fd=client_fd;
-      client_args.file_path=__directory;
-   
-      std::cout<<"Accepted connection\n";
+      for(i32 fd=0;fd<=max_fd;fd++){
+           if(!FD_ISSET(fd,&readfds)){
+              continue;;
+           }
 
-      thread_pool.enqueue([this,client_args](){
-           handle_client(client_args);
-      });
+           if(fd==server_fd){
+                 i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
+                  if(client_fd==-1){
+                  error("Failed to accept connection");
+                  continue;
+               }
+
+                  i32 flags=fcntl(client_fd,F_GETFL,0);
+                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
+
+               FD_SET(client_fd,&masterfds);
+
+               if(client_fd>max_fd){
+                   max_fd=client_fd;
+               }
+
+                std::cout<<"Accepted connection\n";
+
+           }else{
+               
+              
+                CLIENT_ARGS client_args;
+          
+                client_args.client_fd=fd;
+                client_args.file_path=__directory;
+             
+               
+          
+                thread_pool.enqueue([this,client_args,&masterfds](){
+                     handle_client(client_args,masterfds);
+                });
+           }
+      }
+
+
+
      
         
    }
@@ -370,20 +413,33 @@ void Server::start_server(i8 *__directory){
    All client requests will be handled here
 */
 
-void Server::handle_client(const CLIENT_ARGS& client_args){
+void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
 
 
     try{
 
        i8 buffer[BUFFER_SIZE]={0};
-    
-       ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
-       if(received_bytes<0){
-            throw NetworkException("Error receivin client request");
+       string request_data;
+       while(true){
+
+          ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
+
+          if(received_bytes>0){
+               request_data.append(buffer,received_bytes);
+          }else if(received_bytes==0){
+             break;
+         }else{
+             if(errno==EAGAIN || errno==EWOULDBLOCK){
+               break;
+             }else{
+
+                throw NetworkException("Error receiving client request");
+             }
+            
+          }
        }
-       buffer[received_bytes]='\0';
        
-       vector<string> request_line=extract_request_line(buffer);
+       vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(request_data.c_str()));
  
        /*
          The above vector contains :
@@ -431,8 +487,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
        }
  
        shutdown(client_args.client_fd,SHUT_WR);
- 
        close(client_args.client_fd);
+       FD_CLR(client_args.client_fd,&masterfds);
     }catch(const ServerException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
@@ -441,6 +497,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
         close(client_args.client_fd);
+        FD_CLR(client_args.client_fd,&masterfds);
    }catch(const FileIOException& e){
          string __error=e.what();
          std::cerr<<RED<<__error<<RESET<<"\n";
@@ -452,15 +509,45 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
          }
 
          close(client_args.client_fd);
+         FD_CLR(client_args.client_fd,&masterfds);
 
 
    }catch(...){
         std::cerr<<RED<<"Unhandled exception"<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
         close(client_args.client_fd);
+        FD_CLR(client_args.client_fd,&masterfds);
     }
     
 }
+
+
+
+/*
+  send helper
+*/
+
+
+
+ssize_t Server::send_all(i32 client_fd, const char* data, size_t len) {
+    size_t total_sent = 0;
+    while (total_sent < len) {
+        ssize_t sent = send(client_fd, data + total_sent, len - total_sent, 0);
+        if (sent > 0) {
+            total_sent += sent;
+        } else if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                continue;
+            } else {
+                return -1; 
+            }
+        }
+    }
+    return total_sent;
+}
+
+
 
 /*
   Responses 
@@ -468,13 +555,13 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
 
 ssize_t Server::internal_server_error(const i32 client_fd){
              string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
-             return send(client_fd,res.c_str(),res.size(),0);
+             return send_all(client_fd,res.c_str(),res.size());
 }
 
 
  ssize_t Server::not_found(const i32 client_fd){
              string res=response(STATUS::NOT_FOUND,"Not Found");
-             return send(client_fd,res.c_str(),res.size(),0);
+             return send_all(client_fd,res.c_str(),res.size());
  }
 
 
