@@ -350,7 +350,11 @@ void Server::start_server(i8 *__directory){
       
        readfds=masterfds;    
   
-     
+      struct timeval tv;
+      tv.tv_sec = 2; 
+      tv.tv_usec = 0;
+
+   
        
       i32 socket_activiy=select(max_fd+1,&readfds,nullptr,nullptr,nullptr);
 
@@ -368,12 +372,20 @@ void Server::start_server(i8 *__directory){
            if(fd==server_fd){
                  i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
                   if(client_fd==-1){
-                  error("Failed to accept connection");
+                      if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                       error("Failed to accept connection");
+                }
                   continue;
                }
 
-                  i32 flags=fcntl(client_fd,F_GETFL,0);
-                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
+                  // i32 flags=fcntl(client_fd,F_GETFL,0);
+                  // fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
+
+                  // struct timeval timeout;
+                  // timeout.tv_sec = 10;
+                  // timeout.tv_usec = 0;
+
+                  // setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
                FD_SET(client_fd,&masterfds);
 
@@ -420,24 +432,32 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
 
        i8 buffer[BUFFER_SIZE]={0};
        string request_data;
-       while(true){
 
-          ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
+      
 
-          if(received_bytes>0){
-               request_data.append(buffer,received_bytes);
-          }else if(received_bytes==0){
-             break;
-         }else{
-             if(errno==EAGAIN || errno==EWOULDBLOCK){
-               break;
-             }else{
+         ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
+     
+         if(received_bytes>0){
+              request_data.append(buffer,received_bytes);
+         }else if(received_bytes==0){
+           return;
+         }else if(received_bytes<0){
+            if(errno==EAGAIN || errno==EWOULDBLOCK){
+              return;
+            }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
+   
+            close(client_args.client_fd);
+            FD_CLR(client_args.client_fd, &masterfds);
+            return;
+          } else{
+             
+               throw NetworkException("Error receiving client request");
+            }
+           
+         }
+      
 
-                throw NetworkException("Error receiving client request");
-             }
-            
-          }
-       }
+
        
        vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(request_data.c_str()));
  
@@ -458,11 +478,11 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
     
           bytes_sent=echo_endpoint(path,client_args.client_fd);
        }else if(path.starts_with("/user-agent")){
-           hashMap<string,string> headers=extract_headers(buffer);
+           hashMap<string,string> headers=extract_headers(reinterpret_cast<const i8*>(request_data.c_str()));
            bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
        }else if(path.starts_with("/files/") && client_args.file_path){
  
-               string body=extract_request_body(buffer);
+               string body=extract_request_body(request_data);
  
                string directory(client_args.file_path);
                string file_name=path.substr(strlen("/files/"));
@@ -529,7 +549,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
 
 
 
-ssize_t Server::send_all(i32 client_fd, const char* data, size_t len) {
+ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
     size_t total_sent = 0;
     while (total_sent < len) {
         ssize_t sent = send(client_fd, data + total_sent, len - total_sent, 0);
@@ -537,7 +557,6 @@ ssize_t Server::send_all(i32 client_fd, const char* data, size_t len) {
             total_sent += sent;
         } else if (sent < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 continue;
             } else {
                 return -1; 
