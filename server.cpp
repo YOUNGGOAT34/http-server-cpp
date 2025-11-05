@@ -355,8 +355,10 @@ void Server::start_server(i8 *__directory){
    
       std::cout<<"Accepted connection\n";
 
-      thread_pool.enqueue(client_args);
-      // handle_client(client_args);
+      thread_pool.enqueue([this,client_args](){
+           handle_client(client_args);
+      });
+     
         
    }
 

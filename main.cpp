@@ -11,6 +11,8 @@ int main(i32 argc,i8 *argv[]){
 
    i8 *directory=nullptr;
 
+ 
+
    if(argc>1){
        for(int i=0;i<argc;i++){
            if(strcmp(argv[i],"--directory")==0){

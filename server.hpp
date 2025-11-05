@@ -75,7 +75,7 @@ class Server{
             string Version;
             STATUS Code;
             string body;
-            ThreadPool<CLIENT_ARGS> thread_pool;
+            ThreadPool thread_pool;
             string response(STATUS status,const string& __body);
             string extract_request_body_from_path(const string& path );
             string extract_request_body(const string& request);
@@ -101,12 +101,8 @@ class Server{
     public:
             //public methods
             Server()
-                  :thread_pool(50){
-                  thread_pool.set_task_handler([this](CLIENT_ARGS args) {
-                   handle_client(args);
-             });
-
-       }
+                  :thread_pool(std::thread::hardware_concurrency()){ 
+            }
 
             void start_server(i8 *__directory) ;
 
