@@ -300,9 +300,11 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
-    file_descriptors.push_back(server_fd);
+    
 
+  
     make_socket_non_blocking(server_fd);
+
    
    if(server_fd<0){
       error("socket FD creation error");
@@ -343,12 +345,13 @@ void Server::start_server(i8 *__directory){
 
      fds.push_back({server_fd,POLLIN,0});
  
-
+   FDGuard guard{server_fd, fds, mtx};
 
    
    while(1){
       
       //  readfds=masterfds;  
+      std::unique_lock<std::mutex> lock(mtx);
       i32 ready=poll(fds.data(),fds.size(),1000);
       
       if(ready<0){
@@ -369,7 +372,7 @@ void Server::start_server(i8 *__directory){
                   if(client_fd>=0){
                        make_socket_non_blocking(client_fd);
                        fds.push_back({client_fd,POLLIN,0});
-                       file_descriptors.push_back(client_fd);
+                       
                        std::cout<<"Accepted connection\n";
                   }
    
@@ -380,10 +383,10 @@ void Server::start_server(i8 *__directory){
              
                    client_args.client_fd=fds[i].fd;
                    client_args.file_path=__directory;
-                   thread_pool.enqueue([this,client_args,&fds](){
-                        handle_client(client_args,fds);
-                   });
-              }
+                  thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path, &fds](){
+                     handle_client({client_fd, directory}, fds);
+                       });
+                  }
          }
 
       }
@@ -392,7 +395,6 @@ void Server::start_server(i8 *__directory){
    }
 
 
-   close(server_fd);
 
 
 
@@ -423,7 +425,7 @@ i32 Server::accept_client_connection(i32 server_fd){
 
                     return -1;
                 }
-                  file_descriptors.push_back(client_fd);
+                  
 
 
                   return client_fd;
@@ -435,6 +437,8 @@ i32 Server::accept_client_connection(i32 server_fd){
 */
 
 void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& fds){
+
+   FDGuard guard{client_args.client_fd, fds, mtx};
 
     try{
 
@@ -452,20 +456,6 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
                      return;
                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
          
-                        close(client_args.client_fd);
-                        std::erase(file_descriptors,client_args.client_fd);
-                          {
-                              std::unique_lock<std::mutex> lock(mtx);
-
-                              auto it=std::find_if(fds.begin(),fds.end(),
-                                 [fd=client_args.client_fd](const pollfd& p){
-                                       return p.fd==fd;
-                                 }
-                              );
-
-                              if(it !=fds.end()) fds.erase(it);
-
-                           }
                         return;
                } else{
                   
@@ -553,22 +543,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
     }
 
 
-    //remove the fd from the pollfd vector
-
-    close(client_args.client_fd);
-
-    {
-       std::unique_lock<std::mutex> lock(mtx);
-
-       auto it=std::find_if(fds.begin(),fds.end(),
-          [fd=client_args.client_fd](const pollfd& p){
-               return p.fd==fd;
-          }
-      );
-
-      if(it !=fds.end()) fds.erase(it);
-
-    }
+   
 
     
 }

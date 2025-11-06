@@ -111,11 +111,25 @@ class Server{
             Server()
                   :thread_pool(std::thread::hardware_concurrency()){ 
             }
-
-            std::vector<i32> file_descriptors;
-
+            
             void start_server(i8 *__directory) ;
 
+};
+
+
+//file desriptor guard
+struct FDGuard {
+    int fd;
+    std::vector<pollfd>& fds;
+    std::mutex& mtx;
+
+    ~FDGuard() {
+        close(fd);
+        std::unique_lock<std::mutex> lock(mtx);
+        auto it = std::find_if(fds.begin(), fds.end(),
+                               [fd=this->fd](const pollfd& p){ return p.fd==fd; });
+        if(it != fds.end()) fds.erase(it);
+    }
 };
 
 void error(const i8 *message);
