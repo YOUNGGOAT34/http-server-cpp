@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 #include <format>
+#include <poll.h>
 #include <cerrno>
 #include <print>
 #include <sstream>
@@ -16,9 +17,9 @@
 #include <unistd.h>
 #include<fstream>
 #include<filesystem>
+#include <fcntl.h>
 #include "exceptions.hpp"
 #include "thread_pool.hpp"
-#include <fcntl.h>
 
 
 
@@ -97,8 +98,8 @@ class Server{
             i8* read_file_contents(const string &path,size_t& file_size);
             void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
-            void handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds);
-            i32 accept_client_connection(i32 server_fd,fd_set& masterfds);
+            void handle_client(const CLIENT_ARGS& client_args);
+            i32 accept_client_connection(i32 server_fd);
             i32 make_socket_non_blocking(i32 client_fd);
 
 

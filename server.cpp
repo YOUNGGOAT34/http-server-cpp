@@ -338,62 +338,64 @@ void Server::start_server(i8 *__directory){
    
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
+
+     std::vector<pollfd> fds;
+
+     fds.push_back({server_fd,POLLIN,0});
  
-   fd_set readfds,masterfds;
-   FD_ZERO(&masterfds);
-   FD_SET(server_fd,&masterfds);
-   i32 max_fd=server_fd;
+
 
    
    while(1){
       
-       readfds=masterfds;    
+      //  readfds=masterfds;  
+      i32 ready=poll(fds.data(),fds.size(),1000);
+      
+      if(ready<0){
+          error("Poll failed");
+          continue;
+      }
   
-      struct timeval tv;
-      tv.tv_sec = 1; 
-      tv.tv_usec = 0;
 
+
+
+      for(size_t i=0;i<fds.size();i++){
+            
+           if(fds[i].revents & POLLIN){
+
+              if(fds[i].fd==server_fd){
+                    i32 client_fd=accept_client_connection(server_fd);
    
-       
-      i32 socket_activiy=select(max_fd+1,&readfds,nullptr,nullptr,&tv);
-      if(socket_activiy<0){
-           error("Select failed");
-           continue;
-      }
+                  if(client_fd>=0){
+                       make_socket_non_blocking(client_fd);
+                       fds.push_back({client_fd,POLLIN,0});
+                       file_descriptors.push_back(client_fd);
+                       std::cout<<"Accepted connection\n";
+                  }
+   
+        
+              }else{
+                  
+                   CLIENT_ARGS client_args;
+             
+                   client_args.client_fd=fds[i].fd;
+                   client_args.file_path=__directory;
+                   thread_pool.enqueue([this,client_args](){
+                        handle_client(client_args);
+                   });
+              }
+         }
 
-
-      for(i32 fd=0;fd<=max_fd;fd++){
-           if(!FD_ISSET(fd,&readfds)){
-              continue;;
+         if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            close(fds[i].fd);
+            fds.erase(fds.begin() + i);
+            --i;
+        }
            }
 
-           if(fd==server_fd){
-                 i32 client_fd=accept_client_connection(server_fd,masterfds);
-
-               if(client_fd>max_fd){
-                   max_fd=client_fd;
-               }
-
-                std::cout<<"Accepted connection\n";
-
-           }else{
-               
-                CLIENT_ARGS client_args;
-          
-                client_args.client_fd=fd;
-                client_args.file_path=__directory;
-                thread_pool.enqueue([this,client_args,&masterfds](){
-                     handle_client(client_args,masterfds);
-                });
-           }
-      }
         
    }
 
-   for(auto &fd:file_descriptors){
-        close(fd);
-        FD_CLR(fd,&masterfds);
-   }
 
 
 }
@@ -410,7 +412,7 @@ i32 Server::make_socket_non_blocking(i32 fd){
 }
 
 
-i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
+i32 Server::accept_client_connection(i32 server_fd){
 
                    SA client_address;
                    socklen_t client_address_size=sizeof(client_address);
@@ -424,10 +426,7 @@ i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
                     return -1;
                 }
                   file_descriptors.push_back(client_fd);
-                  i32 flags=fcntl(client_fd,F_GETFL,0);
-                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
 
-                  FD_SET(client_fd,&masterfds);
 
                   return client_fd;
     
@@ -437,7 +436,7 @@ i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
    All client requests will be handled here
 */
 
-void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
+void Server::handle_client(const CLIENT_ARGS& client_args){
 
     try{
 
@@ -456,8 +455,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
          
                         close(client_args.client_fd);
-                        FD_CLR(client_args.client_fd, &masterfds);
-                        std::erase(file_descriptors,client_args.client_fd);
+                        // std::erase(file_descriptors,client_args.client_fd);
                         return;
                } else{
                   
@@ -519,12 +517,17 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
     }catch(const ServerException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-        close(client_args.client_fd);
+//         close(client_args.client_fd);
+//         auto it = std::find_if(fds.begin(), fds.end(),
+//         [fd = client_args.client_fd](const pollfd& p){ return p.fd == fd; });
+// if (it != fds.end()) fds.erase(it);
     }catch(const NetworkException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-        close(client_args.client_fd);
-        FD_CLR(client_args.client_fd,&masterfds);
+//         close(client_args.client_fd);
+//         auto it = std::find_if(fds.begin(), fds.end(),
+//         [fd = client_args.client_fd](const pollfd& p){ return p.fd == fd; });
+// if (it != fds.end()) fds.erase(it);
    }catch(const FileIOException& e){
          string __error=e.what();
          std::cerr<<RED<<__error<<RESET<<"\n";
@@ -534,9 +537,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
          }else{
               internal_server_error(client_args.client_fd);
          }
+        
 
-         // close(client_args.client_fd);
-         // FD_CLR(client_args.client_fd,&masterfds);
 
 
    }catch(...){
