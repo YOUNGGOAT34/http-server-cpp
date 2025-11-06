@@ -432,13 +432,10 @@ i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
 
 void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
 
-
     try{
 
        i8 buffer[BUFFER_SIZE]={0};
        string request_data;
-
-      
 
          ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
      
@@ -512,9 +509,6 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
           throw ServerException("Error sending response");
        }
  
-      //  shutdown(client_args.client_fd,SHUT_WR);
-      //  close(client_args.client_fd);
-      //  FD_CLR(client_args.client_fd,&masterfds);
     }catch(const ServerException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
