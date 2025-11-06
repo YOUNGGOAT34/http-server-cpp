@@ -30,6 +30,7 @@ int main(i32 argc,i8 *argv[]){
    Server server;
    server.start_server(directory);
 
+
    return 0;
 }
 

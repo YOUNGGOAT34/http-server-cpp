@@ -106,6 +106,8 @@ class Server{
                   :thread_pool(std::thread::hardware_concurrency()){ 
             }
 
+            std::vector<i32> file_descriptors;
+
             void start_server(i8 *__directory) ;
 
 };

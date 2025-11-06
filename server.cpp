@@ -300,7 +300,7 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
-
+    file_descriptors.push_back(server_fd);
    i32 flags=fcntl(server_fd,F_GETFL,0);
    fcntl(server_fd,F_SETFL,flags | O_NONBLOCK);
    
@@ -351,13 +351,12 @@ void Server::start_server(i8 *__directory){
        readfds=masterfds;    
   
       struct timeval tv;
-      tv.tv_sec = 2; 
+      tv.tv_sec = 1; 
       tv.tv_usec = 0;
 
    
        
-      i32 socket_activiy=select(max_fd+1,&readfds,nullptr,nullptr,nullptr);
-
+      i32 socket_activiy=select(max_fd+1,&readfds,nullptr,nullptr,&tv);
       if(socket_activiy<0){
            error("Select failed");
            continue;
@@ -377,9 +376,9 @@ void Server::start_server(i8 *__directory){
                 }
                   continue;
                }
-
-                  // i32 flags=fcntl(client_fd,F_GETFL,0);
-                  // fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
+                  file_descriptors.push_back(client_fd);
+                  i32 flags=fcntl(client_fd,F_GETFL,0);
+                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
 
                   // struct timeval timeout;
                   // timeout.tv_sec = 10;
@@ -418,7 +417,14 @@ void Server::start_server(i8 *__directory){
    }
 
 
-   close(server_fd);
+
+   for(auto &fd:file_descriptors){
+        close(fd);
+        FD_CLR(fd,&masterfds);
+   }
+
+
+   // close(server_fd);
 }
 
 /*
@@ -446,8 +452,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
               return;
             }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
    
-            close(client_args.client_fd);
-            FD_CLR(client_args.client_fd, &masterfds);
+            // close(client_args.client_fd);
+            // FD_CLR(client_args.client_fd, &masterfds);
             return;
           } else{
              
@@ -506,9 +512,9 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
           throw ServerException("Error sending response");
        }
  
-       shutdown(client_args.client_fd,SHUT_WR);
-       close(client_args.client_fd);
-       FD_CLR(client_args.client_fd,&masterfds);
+      //  shutdown(client_args.client_fd,SHUT_WR);
+      //  close(client_args.client_fd);
+      //  FD_CLR(client_args.client_fd,&masterfds);
     }catch(const ServerException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
@@ -528,15 +534,15 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
               internal_server_error(client_args.client_fd);
          }
 
-         close(client_args.client_fd);
-         FD_CLR(client_args.client_fd,&masterfds);
+         // close(client_args.client_fd);
+         // FD_CLR(client_args.client_fd,&masterfds);
 
 
    }catch(...){
         std::cerr<<RED<<"Unhandled exception"<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-        close(client_args.client_fd);
-        FD_CLR(client_args.client_fd,&masterfds);
+      //   close(client_args.client_fd);
+      //   FD_CLR(client_args.client_fd,&masterfds);
     }
     
 }
