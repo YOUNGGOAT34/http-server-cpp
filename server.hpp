@@ -72,11 +72,13 @@ class Server{
          };
 
     private:
-           //private members and methods
+           //private members
             string Version;
             STATUS Code;
             string body;
             ThreadPool thread_pool;
+            
+            //private methods
             string response(STATUS status,const string& __body);
             string extract_request_body_from_path(const string& path );
             string extract_request_body(const string& request);
@@ -96,6 +98,7 @@ class Server{
             void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
             void handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds);
+            i32 accept_client_connection(i32 server_fd,fd_set& masterfds);
 
 
 

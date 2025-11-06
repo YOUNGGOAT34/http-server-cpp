@@ -334,8 +334,7 @@ void Server::start_server(i8 *__directory){
    }
    
    
-   SA client_address;
-   socklen_t client_address_size=sizeof(client_address);
+  
    
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
 
@@ -369,24 +368,7 @@ void Server::start_server(i8 *__directory){
            }
 
            if(fd==server_fd){
-                 i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
-                  if(client_fd==-1){
-                      if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                       error("Failed to accept connection");
-                }
-                  continue;
-               }
-                  file_descriptors.push_back(client_fd);
-                  i32 flags=fcntl(client_fd,F_GETFL,0);
-                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
-
-                  // struct timeval timeout;
-                  // timeout.tv_sec = 10;
-                  // timeout.tv_usec = 0;
-
-                  // setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
-               FD_SET(client_fd,&masterfds);
+                 i32 client_fd=accept_client_connection(server_fd,masterfds);
 
                if(client_fd>max_fd){
                    max_fd=client_fd;
@@ -396,27 +378,17 @@ void Server::start_server(i8 *__directory){
 
            }else{
                
-              
                 CLIENT_ARGS client_args;
           
                 client_args.client_fd=fd;
                 client_args.file_path=__directory;
-             
-               
-          
                 thread_pool.enqueue([this,client_args,&masterfds](){
                      handle_client(client_args,masterfds);
                 });
            }
       }
-
-
-
-     
         
    }
-
-
 
    for(auto &fd:file_descriptors){
         close(fd);
@@ -424,6 +396,34 @@ void Server::start_server(i8 *__directory){
    }
 
 
+}
+
+/*
+   Helpers of start server function
+*/
+
+
+i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
+
+                   SA client_address;
+                   socklen_t client_address_size=sizeof(client_address);
+                  i32 client_fd=accept(server_fd,(struct sockaddr *)&client_address,&client_address_size);
+                  if(client_fd==-1){
+
+                      if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                          error("Failed to accept connection");
+                      }
+
+                    return -1;
+                }
+                  file_descriptors.push_back(client_fd);
+                  i32 flags=fcntl(client_fd,F_GETFL,0);
+                  fcntl(client_fd,F_SETFL,flags | O_NONBLOCK);
+
+                  FD_SET(client_fd,&masterfds);
+
+                  return client_fd;
+    
 }
 
 /*
@@ -445,21 +445,21 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
          if(received_bytes>0){
               request_data.append(buffer,received_bytes);
          }else if(received_bytes==0){
-           return;
+               return;
          }else if(received_bytes<0){
-            if(errno==EAGAIN || errno==EWOULDBLOCK){
-              return;
-            }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
-   
-            close(client_args.client_fd);
-            FD_CLR(client_args.client_fd, &masterfds);
-            std::erase(file_descriptors,client_args.client_fd);
-            return;
-          } else{
-             
-               throw NetworkException("Error receiving client request");
-            }
-           
+                  if(errno==EAGAIN || errno==EWOULDBLOCK){
+                     return;
+                  }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
+         
+                        close(client_args.client_fd);
+                        FD_CLR(client_args.client_fd, &masterfds);
+                        std::erase(file_descriptors,client_args.client_fd);
+                        return;
+               } else{
+                  
+                     throw NetworkException("Error receiving client request");
+                  }
+               
          }
       
 
