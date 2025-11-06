@@ -99,6 +99,7 @@ class Server{
             string status_code_to_string(const Server::STATUS code);
             void handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds);
             i32 accept_client_connection(i32 server_fd,fd_set& masterfds);
+            i32 make_socket_non_blocking(i32 client_fd);
 
 
 

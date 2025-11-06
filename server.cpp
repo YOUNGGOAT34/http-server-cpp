@@ -301,8 +301,8 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 void Server::start_server(i8 *__directory){
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
     file_descriptors.push_back(server_fd);
-   i32 flags=fcntl(server_fd,F_GETFL,0);
-   fcntl(server_fd,F_SETFL,flags | O_NONBLOCK);
+
+    make_socket_non_blocking(server_fd);
    
    if(server_fd<0){
       error("socket FD creation error");
@@ -403,6 +403,13 @@ void Server::start_server(i8 *__directory){
 */
 
 
+i32 Server::make_socket_non_blocking(i32 fd){
+        i32 flags=fcntl(fd,F_GETFL,0);
+        if(flags==-1) return -1;
+       return fcntl(fd,F_SETFL,flags | O_NONBLOCK);
+}
+
+
 i32 Server::accept_client_connection(i32 server_fd,fd_set& masterfds){
 
                    SA client_address;
@@ -478,7 +485,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
        ssize_t bytes_sent;
     
        if(path.starts_with("/echo/")){
-    
+       
           bytes_sent=echo_endpoint(path,client_args.client_fd);
        }else if(path.starts_with("/user-agent")){
            hashMap<string,string> headers=extract_headers(reinterpret_cast<const i8*>(request_data.c_str()));
@@ -565,6 +572,9 @@ ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
     }
     return total_sent;
 }
+
+
+
 
 
 
