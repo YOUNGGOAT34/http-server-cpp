@@ -380,21 +380,19 @@ void Server::start_server(i8 *__directory){
              
                    client_args.client_fd=fds[i].fd;
                    client_args.file_path=__directory;
-                   thread_pool.enqueue([this,client_args](){
-                        handle_client(client_args);
+                   thread_pool.enqueue([this,client_args,&fds](){
+                        handle_client(client_args,fds);
                    });
               }
          }
 
-         if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-            close(fds[i].fd);
-            fds.erase(fds.begin() + i);
-            --i;
-        }
-           }
+      }
 
         
    }
+
+
+   close(server_fd);
 
 
 
@@ -436,7 +434,7 @@ i32 Server::accept_client_connection(i32 server_fd){
    All client requests will be handled here
 */
 
-void Server::handle_client(const CLIENT_ARGS& client_args){
+void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& fds){
 
     try{
 
@@ -455,7 +453,19 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
          
                         close(client_args.client_fd);
-                        // std::erase(file_descriptors,client_args.client_fd);
+                        std::erase(file_descriptors,client_args.client_fd);
+                          {
+                              std::unique_lock<std::mutex> lock(mtx);
+
+                              auto it=std::find_if(fds.begin(),fds.end(),
+                                 [fd=client_args.client_fd](const pollfd& p){
+                                       return p.fd==fd;
+                                 }
+                              );
+
+                              if(it !=fds.end()) fds.erase(it);
+
+                           }
                         return;
                } else{
                   
@@ -517,17 +527,11 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
     }catch(const ServerException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-//         close(client_args.client_fd);
-//         auto it = std::find_if(fds.begin(), fds.end(),
-//         [fd = client_args.client_fd](const pollfd& p){ return p.fd == fd; });
-// if (it != fds.end()) fds.erase(it);
+
     }catch(const NetworkException& e){
         std::cerr<<RED<<e.what()<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-//         close(client_args.client_fd);
-//         auto it = std::find_if(fds.begin(), fds.end(),
-//         [fd = client_args.client_fd](const pollfd& p){ return p.fd == fd; });
-// if (it != fds.end()) fds.erase(it);
+
    }catch(const FileIOException& e){
          string __error=e.what();
          std::cerr<<RED<<__error<<RESET<<"\n";
@@ -544,9 +548,28 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
    }catch(...){
         std::cerr<<RED<<"Unhandled exception"<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
-      //   close(client_args.client_fd);
-      //   FD_CLR(client_args.client_fd,&masterfds);
+      
+      
     }
+
+
+    //remove the fd from the pollfd vector
+
+    close(client_args.client_fd);
+
+    {
+       std::unique_lock<std::mutex> lock(mtx);
+
+       auto it=std::find_if(fds.begin(),fds.end(),
+          [fd=client_args.client_fd](const pollfd& p){
+               return p.fd==fd;
+          }
+      );
+
+      if(it !=fds.end()) fds.erase(it);
+
+    }
+
     
 }
 
