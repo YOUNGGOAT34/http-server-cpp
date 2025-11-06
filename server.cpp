@@ -424,7 +424,6 @@ void Server::start_server(i8 *__directory){
    }
 
 
-   // close(server_fd);
 }
 
 /*
@@ -452,8 +451,9 @@ void Server::handle_client(const CLIENT_ARGS& client_args,fd_set& masterfds){
               return;
             }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
    
-            // close(client_args.client_fd);
-            // FD_CLR(client_args.client_fd, &masterfds);
+            close(client_args.client_fd);
+            FD_CLR(client_args.client_fd, &masterfds);
+            std::erase(file_descriptors,client_args.client_fd);
             return;
           } else{
              
