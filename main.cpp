@@ -11,6 +11,8 @@ int main(i32 argc,i8 *argv[]){
 
    i8 *directory=nullptr;
 
+
+     Server server;
  
 
    if(argc>1){
@@ -20,14 +22,14 @@ int main(i32 argc,i8 *argv[]){
 
                  directory=argv[i+1];
               }else{
-                 error("Expected a directory name");
+                 server.error("Expected a directory name");
               }
            }
        }
    }
 
 
-   Server server;
+ 
    server.start_server(directory);
 
 

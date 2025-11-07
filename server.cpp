@@ -2,7 +2,7 @@
 #include "server.hpp"
 
 
-void error(const i8 *message){
+void Server::error(const i8 *message){
    std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
    // exit(EXIT_FAILURE);
 }
@@ -59,7 +59,7 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    string res=response(STATUS::OK,extract_request_body_from_path(path));
-   std::cout<<"Here\n"<<res;
+   
    return send_all(client_fd,res.c_str(),res.size());
 }
 
@@ -341,12 +341,8 @@ void Server::start_server(i8 *__directory){
    
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
      
-     int epfd=epoll_create1(0);
+    
 
-     if(epfd==-1){
-         error("Epoll system call failed");
-         exit(EXIT_FAILURE);
-     }
 
      /*
         We will monitor this socket for incoming client connections
@@ -364,7 +360,7 @@ void Server::start_server(i8 *__directory){
      std::vector<epoll_event> events(128);
  
          
-       FDGuard guard{server_fd,epfd, mtx};
+      //  FDGuard guard{server_fd,epfd, mtx};
 
 
    
@@ -395,13 +391,13 @@ void Server::start_server(i8 *__directory){
                        epoll_event client_event{};
 
                        client_event.data.fd=client_fd;
-                       client_event.events=EPOLLIN | EPOLLET;
+                       client_event.events=EPOLLIN;
                        {
                           std::unique_lock<std::mutex> lock(mtx);
                           epoll_ctl(epfd,EPOLL_CTL_ADD,client_fd,&client_event);
                        }
                        
-                       std::cout<<"Accepted connection\n";
+                     //   std::cout<<"Accepted connection\n";
                   }
    
         
@@ -411,8 +407,8 @@ void Server::start_server(i8 *__directory){
              
                    client_args.client_fd=events[i].data.fd;
                    client_args.file_path=__directory;
-                  thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path,epfd](){
-                     handle_client({client_fd, directory},epfd);
+                  thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path](){
+                     handle_client({client_fd, directory});
                        });
                   }
          
@@ -423,7 +419,7 @@ void Server::start_server(i8 *__directory){
    }
 
 
-
+     FDGuard guard(server_fd,epfd, mtx);
 
 
 }
@@ -464,9 +460,9 @@ i32 Server::accept_client_connection(i32 server_fd){
    All client requests will be handled here
 */
 
-void Server::handle_client(const CLIENT_ARGS& client_args,i32 epfd){
+void Server::handle_client(const CLIENT_ARGS& client_args){
 
-   FDGuard guard{client_args.client_fd,epfd, mtx};
+   // FDGuard guard(client_args.client_fd,epfd, mtx);
 
     try{
 
@@ -550,12 +546,14 @@ void Server::handle_client(const CLIENT_ARGS& client_args,i32 epfd){
        }
  
         
-       if(bytes_sent==-1){
+       if(bytes_sent==-1){ 
           throw ServerException("Error sending response");
        }
  
     }catch(const ServerException& e){
+         
         std::cerr<<RED<<e.what()<<RESET<<"\n";
+        std::cout<<strerror(errno)<<" "<<client_args.client_fd<<std::endl;
         internal_server_error(client_args.client_fd);
 
     }catch(const NetworkException& e){
@@ -583,6 +581,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,i32 epfd){
     }
 
 
+
     
 }
 
@@ -594,6 +593,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,i32 epfd){
 
 
 ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
+     FDGuard guard(client_fd,epfd, mtx);
     size_t total_sent = 0;
     while (total_sent < len) {
         ssize_t sent = send(client_fd, data + total_sent, len - total_sent, 0);
@@ -637,6 +637,7 @@ string Server::response(const STATUS status,const string& __body){
            "HTTP/1.1 {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
+           "Connection: close\r\n"
            "\r\n"
            "{}",
            status_code_to_string(status),

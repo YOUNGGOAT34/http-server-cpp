@@ -79,6 +79,7 @@ class Server{
             string body;
             ThreadPool thread_pool;
             std::mutex mtx;
+             i32 epfd;
             
             //private methods
             string response(STATUS status,const string& __body);
@@ -99,9 +100,10 @@ class Server{
             i8* read_file_contents(const string &path,size_t& file_size);
             void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
-            void handle_client(const CLIENT_ARGS& client_args,i32 epfd);
+            void handle_client(const CLIENT_ARGS& client_args);
             i32 accept_client_connection(i32 server_fd);
             i32 make_socket_non_blocking(i32 client_fd);
+            
 
 
 
@@ -109,28 +111,21 @@ class Server{
     public:
             //public methods
             Server()
-                  :thread_pool(std::thread::hardware_concurrency()){ 
+                  :thread_pool(32){ 
+                   epfd=epoll_create1(0);
+
+
+                if(epfd==-1){
+                    error("Epoll system call failed");
+                    exit(EXIT_FAILURE);
+                }
             }
             
             void start_server(i8 *__directory) ;
+            void error(const i8 *message);
 
 };
 
-
-//file desriptor guard
-// struct FDGuard {
-//     int fd;
-//     std::vector<pollfd>& fds;
-//     std::mutex& mtx;
-
-//     ~FDGuard() {
-//         close(fd);
-//         std::unique_lock<std::mutex> lock(mtx);
-//         auto it = std::find_if(fds.begin(), fds.end(),
-//                                [fd=this->fd](const pollfd& p){ return p.fd==fd; });
-//         if(it != fds.end()) fds.erase(it);
-//     }
-// };
 
 //epoll guard
 struct FDGuard {
@@ -138,14 +133,30 @@ struct FDGuard {
     i32 epfd;
     std::mutex& mtx;
 
+
+    FDGuard(const FDGuard&) = delete;
+    FDGuard& operator=(const FDGuard&) = delete;
+    FDGuard(FDGuard&&) = delete;
+    FDGuard& operator=(FDGuard&&) = delete;
+
+    FDGuard(i32 fd_, i32 epfd_, std::mutex& mtx_)
+    : fd(fd_), epfd(epfd_), mtx(mtx_) {}
+
     ~FDGuard() {
+
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
+
+        }
+
+
         close(fd);
-        std::unique_lock<std::mutex> lock(mtx);
-        
-        epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
     }
+
+
+
 };
 
 
-void error(const i8 *message);
 #endif
