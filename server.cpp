@@ -59,6 +59,7 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
    string res=response(STATUS::OK,extract_request_body_from_path(path));
+   std::cout<<"Here\n"<<res;
    return send_all(client_fd,res.c_str(),res.size());
 }
 
@@ -339,39 +340,66 @@ void Server::start_server(i8 *__directory){
   
    
    std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
+     
+     int epfd=epoll_create1(0);
 
+     if(epfd==-1){
+         error("Epoll system call failed");
+         exit(EXIT_FAILURE);
+     }
 
-     std::vector<pollfd> fds;
+     /*
+        We will monitor this socket for incoming client connections
+     */
 
-     fds.push_back({server_fd,POLLIN,0});
+     epoll_event event{};
+     event.data.fd=server_fd;
+     event.events=EPOLLIN;
+
+     if(epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &event)==-1){
+        error("Failed to add the server fd to epoll");
+        exit(EXIT_FAILURE);
+     }
+
+     std::vector<epoll_event> events(128);
  
-   FDGuard guard{server_fd, fds, mtx};
+         
+       FDGuard guard{server_fd,epfd, mtx};
+
 
    
    while(1){
       
-      //  readfds=masterfds;  
-      std::unique_lock<std::mutex> lock(mtx);
-      i32 ready=poll(fds.data(),fds.size(),1000);
+        i32 n;
+       {
+          std::unique_lock<std::mutex> lock(mtx);
+          n=epoll_wait(epfd,events.data(),events.size(),-1);
+       }
       
-      if(ready<0){
+      if(n==-1){
           error("Poll failed");
           continue;
       }
   
 
+    
 
-
-      for(size_t i=0;i<fds.size();i++){
+      for(int i=0;i<n;i++){
             
-           if(fds[i].revents & POLLIN){
-
-              if(fds[i].fd==server_fd){
+              if(events[i].data.fd==server_fd){
                     i32 client_fd=accept_client_connection(server_fd);
    
                   if(client_fd>=0){
                        make_socket_non_blocking(client_fd);
-                       fds.push_back({client_fd,POLLIN,0});
+                       
+                       epoll_event client_event{};
+
+                       client_event.data.fd=client_fd;
+                       client_event.events=EPOLLIN | EPOLLET;
+                       {
+                          std::unique_lock<std::mutex> lock(mtx);
+                          epoll_ctl(epfd,EPOLL_CTL_ADD,client_fd,&client_event);
+                       }
                        
                        std::cout<<"Accepted connection\n";
                   }
@@ -381,13 +409,13 @@ void Server::start_server(i8 *__directory){
                   
                    CLIENT_ARGS client_args;
              
-                   client_args.client_fd=fds[i].fd;
+                   client_args.client_fd=events[i].data.fd;
                    client_args.file_path=__directory;
-                  thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path, &fds](){
-                     handle_client({client_fd, directory}, fds);
+                  thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path,epfd](){
+                     handle_client({client_fd, directory},epfd);
                        });
                   }
-         }
+         
 
       }
 
@@ -436,39 +464,49 @@ i32 Server::accept_client_connection(i32 server_fd){
    All client requests will be handled here
 */
 
-void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& fds){
+void Server::handle_client(const CLIENT_ARGS& client_args,i32 epfd){
 
-   FDGuard guard{client_args.client_fd, fds, mtx};
+   FDGuard guard{client_args.client_fd,epfd, mtx};
 
     try{
 
        i8 buffer[BUFFER_SIZE]={0};
        string request_data;
-
-         ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
      
-         if(received_bytes>0){
-              request_data.append(buffer,received_bytes);
-         }else if(received_bytes==0){
-               return;
-         }else if(received_bytes<0){
-                  if(errno==EAGAIN || errno==EWOULDBLOCK){
-                     return;
-                  }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
-         
-                        return;
-               } else{
-                  
-                     throw NetworkException("Error receiving client request");
-                  }
-               
-         }
-      
+       while(true){
 
+          ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
+            
+          if(received_bytes>0){
+               
+               request_data.append(buffer,received_bytes);
+               continue;
+          }else if(received_bytes==0){
+                
+                break;
+          }else if(received_bytes<0){
+                   if(errno==EAGAIN || errno==EWOULDBLOCK){
+                     
+                      break;
+                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
+          
+                         break;
+                } else{
+                   
+                      throw NetworkException("Error receiving client request");
+                   }
+                
+          }
+
+          
+       }
+      
+      
+         
 
        
        vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(request_data.c_str()));
- 
+         
        /*
          The above vector contains :
          Request method at the first index:[0]
@@ -476,6 +514,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
          HTTP version at the third index:[2]
  
         */
+
+        
  
        string path=request_line[1];
        string METHOD=request_line[0];
@@ -483,7 +523,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
        ssize_t bytes_sent;
     
        if(path.starts_with("/echo/")){
-       
+          
           bytes_sent=echo_endpoint(path,client_args.client_fd);
        }else if(path.starts_with("/user-agent")){
            hashMap<string,string> headers=extract_headers(reinterpret_cast<const i8*>(request_data.c_str()));
@@ -543,8 +583,6 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
     }
 
 
-   
-
     
 }
 
@@ -553,7 +591,6 @@ void Server::handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& f
 /*
   send helper
 */
-
 
 
 ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {

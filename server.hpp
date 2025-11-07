@@ -7,7 +7,7 @@
 #include <cstring>
 #include <string>
 #include <format>
-#include <poll.h>
+#include <sys/epoll.h>
 #include <cerrno>
 #include <print>
 #include <sstream>
@@ -99,7 +99,7 @@ class Server{
             i8* read_file_contents(const string &path,size_t& file_size);
             void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
-            void handle_client(const CLIENT_ARGS& client_args,std::vector<pollfd>& fds);
+            void handle_client(const CLIENT_ARGS& client_args,i32 epfd);
             i32 accept_client_connection(i32 server_fd);
             i32 make_socket_non_blocking(i32 client_fd);
 
@@ -118,19 +118,34 @@ class Server{
 
 
 //file desriptor guard
+// struct FDGuard {
+//     int fd;
+//     std::vector<pollfd>& fds;
+//     std::mutex& mtx;
+
+//     ~FDGuard() {
+//         close(fd);
+//         std::unique_lock<std::mutex> lock(mtx);
+//         auto it = std::find_if(fds.begin(), fds.end(),
+//                                [fd=this->fd](const pollfd& p){ return p.fd==fd; });
+//         if(it != fds.end()) fds.erase(it);
+//     }
+// };
+
+//epoll guard
 struct FDGuard {
-    int fd;
-    std::vector<pollfd>& fds;
+    i32 fd;
+    i32 epfd;
     std::mutex& mtx;
 
     ~FDGuard() {
         close(fd);
         std::unique_lock<std::mutex> lock(mtx);
-        auto it = std::find_if(fds.begin(), fds.end(),
-                               [fd=this->fd](const pollfd& p){ return p.fd==fd; });
-        if(it != fds.end()) fds.erase(it);
+        
+        epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
     }
 };
+
 
 void error(const i8 *message);
 #endif
