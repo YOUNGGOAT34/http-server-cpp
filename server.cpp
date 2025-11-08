@@ -22,6 +22,30 @@ string Server::status_code_to_string(const Server::STATUS code){
     
 }
 
+
+//header manipulation method
+string Server::get_header_value(string request,HEADERS header){
+     
+      string header_type;
+
+      switch(header){
+         case HEADERS::CONTENT_LEN:
+               header_type="Content-Length";
+               break;
+
+         default:
+               break;
+      }
+      
+      hashMap<string,string> headers=extract_headers(request.c_str());
+
+      if(headers.find(header_type)==headers.end()){
+         return "";
+       }
+      
+       return headers.at(header_type);
+}
+
 /*
    When used for the echo endpoint 
    /echo/body
@@ -49,12 +73,15 @@ string Server::extract_request_body(const string& request){
 ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers){
 
    if(headers.find("User-Agent")==headers.end()){
-       error("User-Agent not found in the headers");
+       return not_found(client_fd);
    }
    
    string res=response(STATUS::OK,headers.at("User-Agent"));
    return send_all(client_fd,res.c_str(),res.size());
 }
+
+
+
 
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
@@ -357,10 +384,11 @@ void Server::start_server(i8 *__directory){
         exit(EXIT_FAILURE);
      }
 
-     std::vector<epoll_event> events(128);
+     std::vector<epoll_event> events(1024);
  
          
-      //  FDGuard guard{server_fd,epfd, mtx};
+    FDGuard guard(server_fd,epfd, mtx);
+  
 
 
    
@@ -377,7 +405,8 @@ void Server::start_server(i8 *__directory){
           continue;
       }
   
-
+     
+   
     
 
       for(int i=0;i<n;i++){
@@ -397,7 +426,7 @@ void Server::start_server(i8 *__directory){
                           epoll_ctl(epfd,EPOLL_CTL_ADD,client_fd,&client_event);
                        }
                        
-                     //   std::cout<<"Accepted connection\n";
+                     
                   }
    
         
@@ -419,7 +448,7 @@ void Server::start_server(i8 *__directory){
    }
 
 
-     FDGuard guard(server_fd,epfd, mtx);
+     
 
 
 }
@@ -460,48 +489,25 @@ i32 Server::accept_client_connection(i32 server_fd){
    All client requests will be handled here
 */
 
+
+
 void Server::handle_client(const CLIENT_ARGS& client_args){
 
-   // FDGuard guard(client_args.client_fd,epfd, mtx);
 
     try{
 
-       i8 buffer[BUFFER_SIZE]={0};
-       string request_data;
-     
-       while(true){
-
-          ssize_t received_bytes=recv(client_args.client_fd,buffer,BUFFER_SIZE-1,0);
-            
-          if(received_bytes>0){
-               
-               request_data.append(buffer,received_bytes);
-               continue;
-          }else if(received_bytes==0){
-                
-                break;
-          }else if(received_bytes<0){
-                   if(errno==EAGAIN || errno==EWOULDBLOCK){
-                     
-                      break;
-                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
-          
-                         break;
-                } else{
-                   
-                      throw NetworkException("Error receiving client request");
-                   }
-                
-          }
-
-          
-       }
-      
-      
-         
-
        
-       vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(request_data.c_str()));
+       string headers=read_headers(client_args.client_fd);
+     
+       string content_length_string=get_header_value(headers,HEADERS::CONTENT_LEN);
+       
+       size_t content_len=content_length_string.empty()?0:std::stoul(content_length_string);
+      
+       string body=read_body(client_args.client_fd,headers,content_len);
+         
+      
+       
+       vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(headers.c_str()));
          
        /*
          The above vector contains :
@@ -522,12 +528,10 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
           
           bytes_sent=echo_endpoint(path,client_args.client_fd);
        }else if(path.starts_with("/user-agent")){
-           hashMap<string,string> headers=extract_headers(reinterpret_cast<const i8*>(request_data.c_str()));
-           bytes_sent=user_agent_endpoint(client_args.client_fd,headers);
+           hashMap<string,string> headers__=extract_headers(reinterpret_cast<const i8*>(headers.c_str()));
+           bytes_sent=user_agent_endpoint(client_args.client_fd,headers__);
        }else if(path.starts_with("/files/") && client_args.file_path){
- 
-               string body=extract_request_body(request_data);
- 
+            
                string directory(client_args.file_path);
                string file_name=path.substr(strlen("/files/"));
                string full_path=directory+file_name;
@@ -580,11 +584,105 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       
     }
 
-
-
-    
 }
 
+
+string Server::read_body(i32 client_fd,string& headers,size_t content_len){
+
+    i8 buffer[BUFFER_SIZE]={0};
+    string body;
+
+    size_t headers_end=headers.find("\r\n\r\n");
+    if(headers_end!=string::npos){
+       size_t body_start=headers_end+4;
+
+       if(headers.size()>body_start){
+          body=headers.substr(body_start);
+       }
+
+    }
+
+    
+
+   while(body.size()<content_len){
+ 
+          ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
+            
+          if(received_bytes>0){
+               
+               body.append(buffer,received_bytes);
+               continue;
+             }else if(received_bytes==0){
+                
+                break;
+            }else if(received_bytes<0){
+                     if(errno==EAGAIN || errno==EWOULDBLOCK){
+                     
+                      break;
+                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
+                         break;
+                } else{
+                   
+                      throw NetworkException("Error receiving client request");
+                   }
+                
+          }
+
+          
+       }
+
+   
+   if(body.size() > content_len){
+        body.resize(content_len);
+    }
+
+
+
+    return body;
+}
+
+//This will read the request until the end of the headers.
+
+string Server::read_headers(i32 client_fd){
+
+      i8 buffer[BUFFER_SIZE]={0};
+       string request_data;
+     
+       while(true){
+ 
+          ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
+            
+          if(received_bytes>0){
+               
+               request_data.append(buffer,received_bytes);
+               if(request_data.find("\r\n\r\n")!=string::npos){
+                     break;
+               }
+            
+               continue;
+          }else if(received_bytes==0){
+                
+                break;
+          }else if(received_bytes<0){
+                   if(errno==EAGAIN || errno==EWOULDBLOCK){
+                     
+                      break;
+                   }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
+          
+                         break;
+                } else{
+                   
+                      throw NetworkException("Error receiving client request");
+                   }
+                
+          }
+
+          
+       }
+
+       return request_data;
+
+}
 
 
 /*
@@ -593,7 +691,7 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
 
 
 ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
-     FDGuard guard(client_fd,epfd, mtx);
+    FDGuard guard(client_fd,epfd, mtx);
     size_t total_sent = 0;
     while (total_sent < len) {
         ssize_t sent = send(client_fd, data + total_sent, len - total_sent, 0);
@@ -637,7 +735,7 @@ string Server::response(const STATUS status,const string& __body){
            "HTTP/1.1 {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
-           "Connection: close\r\n"
+           "Connection: keep-alive\r\n"
            "\r\n"
            "{}",
            status_code_to_string(status),

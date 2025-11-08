@@ -22,7 +22,7 @@ int main(i32 argc,i8 *argv[]){
 
                  directory=argv[i+1];
               }else{
-                 server.error("Expected a directory name");
+               //   server.error("Expected a directory name");
               }
            }
        }

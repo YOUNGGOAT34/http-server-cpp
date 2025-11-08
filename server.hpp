@@ -67,6 +67,11 @@ class Server{
             BAD_REQUEST=400
          };
 
+         enum class HEADERS{
+                CONTENT_LEN
+
+         };
+
          struct  CLIENT_ARGS{
                 i32 client_fd;
                 i8 *file_path;
@@ -103,8 +108,11 @@ class Server{
             void handle_client(const CLIENT_ARGS& client_args);
             i32 accept_client_connection(i32 server_fd);
             i32 make_socket_non_blocking(i32 client_fd);
+            string get_header_value(string request,HEADERS header);
+            string read_headers(i32 client_fd);
+            string read_body(i32 client_fd,string& headers,size_t content_len);
             
-
+            
 
 
             
