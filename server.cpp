@@ -435,15 +435,26 @@ void Server::start_server(i8 *__directory){
    
         
               }else{
+
+                  
                   
                    CLIENT_ARGS client_args;
              
                    client_args.client_fd=events[i].data.fd;
                    client_args.file_path=__directory;
+
+                   {
+                               std::unique_lock<std::mutex> lock(mtx);
+                             epoll_ctl(epfd,EPOLL_CTL_DEL,client_args.client_fd,nullptr);
+                   }
+                
                   thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path](){
                      handle_client({client_fd, directory});
                        });
+
                   }
+
+
          
 
       }
@@ -512,6 +523,8 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
          string connection_header=get_header_value(headers,HEADERS::CONNECTION);
 
          bool should_close=(connection_header=="close");
+
+         // bool should_close=true;
          
          size_t content_len=content_length_string.empty()?0:std::stoul(content_length_string);
         
@@ -567,6 +580,19 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
          }
 
          if(should_close) break;
+      
+
+             epoll_event ev{};
+            ev.data.fd = client_args.client_fd;
+            ev.events = EPOLLIN; 
+            std::unique_lock<std::mutex> lock(mtx);
+            if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_args.client_fd, &ev) == -1) {
+              
+               if (errno == EEXIST)
+                     epoll_ctl(epfd, EPOLL_CTL_MOD, client_args.client_fd, &ev);
+            }
+
+            return;
       }
 
        
@@ -601,15 +627,14 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       
     }
 
-
-
-    FDGuard guard(client_args.client_fd,epfd, mtx);
+   close(client_args.client_fd);
 
 }
 
 
 string Server::read_body(i32 client_fd,string& headers,size_t content_len){
 
+     
     i8 buffer[BUFFER_SIZE]={0};
     string body;
 
@@ -626,6 +651,8 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
     
 
    while(body.size()<content_len){
+
+         //  FDGuard guard(client_fd,epfd, mtx);
  
           ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
             
@@ -638,7 +665,6 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
                 break;
             }else if(received_bytes<0){
                      if(errno==EAGAIN || errno==EWOULDBLOCK){
-                     
                       break;
                    }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
                          break;
@@ -670,6 +696,8 @@ string Server::read_headers(i32 client_fd){
        string request_data;
      
        while(true){
+
+        
  
           ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
             
