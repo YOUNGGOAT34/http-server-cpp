@@ -33,6 +33,10 @@ string Server::get_header_value(string request,HEADERS header){
                header_type="Content-Length";
                break;
 
+         case HEADERS::CONNECTION:
+               header_type="Connection";
+               break;
+
          default:
                break;
       }
@@ -70,13 +74,13 @@ string Server::extract_request_body(const string& request){
 
 //endpoint methods
 
-ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers){
+ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers,bool should_close){
 
    if(headers.find("User-Agent")==headers.end()){
        return not_found(client_fd);
    }
    
-   string res=response(STATUS::OK,headers.at("User-Agent"));
+   string res=response(STATUS::OK,headers.at("User-Agent"),should_close);
    return send_all(client_fd,res.c_str(),res.size());
 }
 
@@ -84,31 +88,31 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
 
 
 
-ssize_t Server::echo_endpoint(const string& path,const i32 client_fd){
-   string res=response(STATUS::OK,extract_request_body_from_path(path));
+ssize_t Server::echo_endpoint(const string& path,const i32 client_fd,bool should_close){
+   string res=response(STATUS::OK,extract_request_body_from_path(path),should_close);
    
    return send_all(client_fd,res.c_str(),res.size());
 }
 
 
-ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body){
+ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close){
        
            write_response_to_file(path,body);
-           string res=response(STATUS::OK,"Created successfully");
+           string res=response(STATUS::OK,"Created successfully",should_close);
            return send_all(client_fd,res.c_str(),res.size());
         
 }
 
 
 
-ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
+ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path,bool should_close){
    
 
       size_t file_size;
       i8 *buffer=read_file_contents(path,file_size);
        
       std::string body(buffer,file_size);
-      string res= response(STATUS::OK,body);
+      string res= response(STATUS::OK,body,should_close);
       delete[] buffer;
       return send_all(client_fd,res.c_str(),res.size());
 
@@ -116,7 +120,7 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path){
 }
 
 
-ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string& body){
+ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close){
     std::filesystem::path file_path(path);
     
     bool file_exists=std::filesystem::exists(file_path);
@@ -136,16 +140,16 @@ ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string&
 
     string res;
     if(file_exists){
-       res=response(STATUS::OK,"File replaced successfully");
+       res=response(STATUS::OK,"File replaced successfully",should_close);
     }else{
-       res=response(STATUS::CREATED,"File created successully");
+       res=response(STATUS::CREATED,"File created successully",should_close);
     }
 
     return send_all(client_fd,res.c_str(),res.size());
    
 }
 
-ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 client_fd){
+ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 client_fd,bool should_close){
       std::filesystem::path file_path(path);
 
       if(!std::filesystem::exists(file_path)){
@@ -162,22 +166,22 @@ ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 cl
 
       file.close();
 
-      string res=response(STATUS::OK,"File updated successfully");
+      string res=response(STATUS::OK,"File updated successfully",should_close);
       return send_all(client_fd,res.c_str(),res.size());
 }
 
-ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path){
+ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path,bool should_close){
       std::filesystem::path file_path(path);
       string res;
       if(std::filesystem::remove(file_path)){
-           res=response(STATUS::OK,"Deleted successfully");
+           res=response(STATUS::OK,"Deleted successfully",should_close);
            return send_all(client_fd,res.c_str(),res.size());
       }else{
-           res=response(STATUS::NOT_FOUND,"Not Found");
+           res=response(STATUS::NOT_FOUND,"Not Found",should_close);
            return send_all(client_fd,res.c_str(),res.size());
       }
 
-      res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+      res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error",should_close);
       return send_all(client_fd,res.c_str(),res.size());
 
 }
@@ -493,66 +497,79 @@ i32 Server::accept_client_connection(i32 server_fd){
 
 void Server::handle_client(const CLIENT_ARGS& client_args){
 
-
+   
     try{
 
-       
-       string headers=read_headers(client_args.client_fd);
-     
-       string content_length_string=get_header_value(headers,HEADERS::CONTENT_LEN);
-       
-       size_t content_len=content_length_string.empty()?0:std::stoul(content_length_string);
-      
-       string body=read_body(client_args.client_fd,headers,content_len);
-         
-      
-       
-       vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(headers.c_str()));
-         
-       /*
-         The above vector contains :
-         Request method at the first index:[0]
-         Request path at the second index:[1]
-         HTTP version at the third index:[2]
- 
-        */
 
+      while(true){
+
+         string headers=read_headers(client_args.client_fd);
+
+         if(headers.empty()) break;
+       
+         string content_length_string=get_header_value(headers,HEADERS::CONTENT_LEN);
+
+         string connection_header=get_header_value(headers,HEADERS::CONNECTION);
+
+         bool should_close=(connection_header=="close");
+         
+         size_t content_len=content_length_string.empty()?0:std::stoul(content_length_string);
         
- 
-       string path=request_line[1];
-       string METHOD=request_line[0];
- 
-       ssize_t bytes_sent;
-    
-       if(path.starts_with("/echo/")){
+         string body=read_body(client_args.client_fd,headers,content_len);
+           
+        
+         
+         vector<string> request_line=extract_request_line(reinterpret_cast<const i8*>(headers.c_str()));
+           
+         /*
+           The above vector contains :
+           Request method at the first index:[0]
+           Request path at the second index:[1]
+           HTTP version at the third index:[2]
+   
+          */
+   
           
-          bytes_sent=echo_endpoint(path,client_args.client_fd);
-       }else if(path.starts_with("/user-agent")){
-           hashMap<string,string> headers__=extract_headers(reinterpret_cast<const i8*>(headers.c_str()));
-           bytes_sent=user_agent_endpoint(client_args.client_fd,headers__);
-       }else if(path.starts_with("/files/") && client_args.file_path){
+   
+         string path=request_line[1];
+         string METHOD=request_line[0];
+   
+         ssize_t bytes_sent;
+      
+         if(path.starts_with("/echo/")){
             
-               string directory(client_args.file_path);
-               string file_name=path.substr(strlen("/files/"));
-               string full_path=directory+file_name;
-              if(METHOD=="GET"){
-                 bytes_sent=get_file_endpoint(client_args.client_fd,full_path);
-              }else if(METHOD=="POST"){
-                  
-                  bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body);
-              }else if(METHOD=="DELETE"){
-                  bytes_sent=delete_file_endpoint(client_args.client_fd,full_path);
-              }else if(METHOD=="PUT"){
-                   bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body);
-              }else if(METHOD=="PATCH"){
-                   bytes_sent=patch_file_endpoint(body,full_path,client_args.client_fd);
-              }
-       }
- 
-        
-       if(bytes_sent==-1){ 
-          throw ServerException("Error sending response");
-       }
+            bytes_sent=echo_endpoint(path,client_args.client_fd,should_close);
+         }else if(path.starts_with("/user-agent")){
+             hashMap<string,string> headers__=extract_headers(reinterpret_cast<const i8*>(headers.c_str()));
+             bytes_sent=user_agent_endpoint(client_args.client_fd,headers__,should_close);
+         }else if(path.starts_with("/files/") && client_args.file_path){
+              
+                 string directory(client_args.file_path);
+                 string file_name=path.substr(strlen("/files/"));
+                 string full_path=directory+file_name;
+                if(METHOD=="GET"){
+                   bytes_sent=get_file_endpoint(client_args.client_fd,full_path,should_close);
+                }else if(METHOD=="POST"){
+                    
+                    bytes_sent=post_file_endpoint(full_path,client_args.client_fd,body,should_close);
+                }else if(METHOD=="DELETE"){
+                    bytes_sent=delete_file_endpoint(client_args.client_fd,full_path,should_close);
+                }else if(METHOD=="PUT"){
+                     bytes_sent=put_file_endpoint(full_path,client_args.client_fd,body,should_close);
+                }else if(METHOD=="PATCH"){
+                     bytes_sent=patch_file_endpoint(body,full_path,client_args.client_fd,should_close);
+                }
+         }
+   
+          
+         if(bytes_sent==-1){ 
+            throw ServerException("Error sending response");
+         }
+
+         if(should_close) break;
+      }
+
+       
  
     }catch(const ServerException& e){
          
@@ -583,6 +600,10 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
       
       
     }
+
+
+
+    FDGuard guard(client_args.client_fd,epfd, mtx);
 
 }
 
@@ -694,7 +715,7 @@ string Server::read_headers(i32 client_fd){
 
 
 ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
-    FDGuard guard(client_fd,epfd, mtx);
+   
     size_t total_sent = 0;
     while (total_sent < len) {
         ssize_t sent = send(client_fd, data + total_sent, len - total_sent, 0);
@@ -721,28 +742,29 @@ ssize_t Server::send_all(i32 client_fd, const i8* data, size_t len) {
 */
 
 ssize_t Server::internal_server_error(const i32 client_fd){
-             string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error");
+             string res=response(STATUS::INTERNAL_SERVER_ERROR,"Internal Server Error",true);
              return send_all(client_fd,res.c_str(),res.size());
 }
 
 
  ssize_t Server::not_found(const i32 client_fd){
-             string res=response(STATUS::NOT_FOUND,"Not Found");
+             string res=response(STATUS::NOT_FOUND,"Not Found",true);
              return send_all(client_fd,res.c_str(),res.size());
  }
 
 
-string Server::response(const STATUS status,const string& __body){
+string Server::response(const STATUS status,const string& __body,bool should_close){
       
       return std::format(
            "HTTP/1.1 {}\r\n"
            "Content-Type: text/plain\r\n"
            "Content-Length: {}\r\n"
-           "Connection: keep-alive\r\n"
+           "Connection: {}\r\n"
            "\r\n"
            "{}",
            status_code_to_string(status),
            __body.size(),
+           should_close?"close":"keep-alive",
            __body   
       );
 }

@@ -68,7 +68,8 @@ class Server{
          };
 
          enum class HEADERS{
-                CONTENT_LEN
+                CONTENT_LEN,
+                CONNECTION
 
          };
 
@@ -87,18 +88,18 @@ class Server{
              i32 epfd;
             
             //private methods
-            string response(STATUS status,const string& __body);
+            string response(STATUS status,const string& __body,bool should_close);
             string extract_request_body_from_path(const string& path );
             string extract_request_body(const string& request);
             vector<string> extract_request_line(const i8 *buffer);
             hashMap<string,string> extract_headers(const i8 *buffer);
-            ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers);
-            ssize_t echo_endpoint(const string& path,const i32 client_fd);
-            ssize_t get_file_endpoint(const i32 client_fd,const string& path);
-            ssize_t post_file_endpoint(const string& path,const i32 client_fd,string& body);
-            ssize_t put_file_endpoint(const string& full_path,const i32 client_fd,string& body);
-            ssize_t patch_file_endpoint(string& body,const string& path,const i32 client_fd);
-            ssize_t delete_file_endpoint(const i32 client_fd,const string& path);
+            ssize_t user_agent_endpoint(const i32 client_fd,const hashMap<string,string>& headers,bool should_close);
+            ssize_t echo_endpoint(const string& path,const i32 client_fd,bool should_close);
+            ssize_t get_file_endpoint(const i32 client_fd,const string& path,bool should_close);
+            ssize_t post_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close);
+            ssize_t put_file_endpoint(const string& full_path,const i32 client_fd,string& body,bool should_close);
+            ssize_t patch_file_endpoint(string& body,const string& path,const i32 client_fd,bool should_close);
+            ssize_t delete_file_endpoint(const i32 client_fd,const string& path,bool should_close);
             ssize_t not_found(const i32 client_fd);
             ssize_t internal_server_error(const i32 client_fd);
             ssize_t send_all(i32 client_fd, const i8* data, size_t len);
@@ -155,11 +156,12 @@ struct FDGuard {
         {
             std::unique_lock<std::mutex> lock(mtx);
             epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
+            // close(fd);
 
         }
 
 
-        close(fd);
+        
     }
 
 
