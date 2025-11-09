@@ -684,10 +684,6 @@ string Server::read_headers(i32 client_fd){
             
                continue;
           }else if(received_bytes==0){
-                  {  
-                    std::unique_lock<std::mutex> lock(mtx);
-                    std::cout<<GREEN<<"Client disconnected\n"<<RESET;
-                  }
                 break;
           }else if(received_bytes<0){
                    if(errno==EAGAIN || errno==EWOULDBLOCK){
