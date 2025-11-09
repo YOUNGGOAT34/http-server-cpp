@@ -486,9 +486,6 @@ i32 Server::accept_client_connection(i32 server_fd){
 
 void Server::handle_client(const CLIENT_ARGS& client_args){
 
-  
-
-    
     try{
 
       int i=0;
@@ -565,11 +562,11 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
             FDGuard fdguard(client_args.client_fd,epfd,mtx);
             break;
          } 
-            return;
+            continue;
       }
 
     
-
+    
     }catch(const ServerException& e){
          
         std::cerr<<RED<<e.what()<<RESET<<"\n";
@@ -639,7 +636,7 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
                 break;
             }else if(received_bytes<0){
                      if(errno==EAGAIN || errno==EWOULDBLOCK){
-                      break;
+                      continue;
                    }else if (errno == ECONNRESET || errno == EBADF || errno == ENOTCONN) {
                          break;
                 } else{
