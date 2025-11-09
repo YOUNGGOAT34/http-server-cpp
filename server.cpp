@@ -4,7 +4,25 @@
 
 void Server::error(const i8 *message){
    std::print(std::cerr, "{} ERROR: {} ({}){}\n" ,RED,message,strerror(errno),RESET);
-   // exit(EXIT_FAILURE);
+}
+
+i32 Server::create_epoll_event(i32 fd){
+            epoll_event ev{};
+            ev.data.fd =fd;
+            ev.events = EPOLLIN; 
+            std::unique_lock<std::mutex> lock(mtx);
+            if (epoll_ctl(epfd, EPOLL_CTL_ADD,fd, &ev) == -1) {
+               if (errno == EEXIST){
+
+                  epoll_ctl(epfd, EPOLL_CTL_MOD,fd, &ev);
+               }else{
+                   error("Failed to add epoll event");
+                   return -1;
+               }
+            }
+
+   return 0;
+
 }
 
 string Server::status_code_to_string(const Server::STATUS code){
@@ -81,11 +99,9 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
    }
    
    string res=response(STATUS::OK,headers.at("User-Agent"),should_close);
+  
    return send_all(client_fd,res.c_str(),res.size());
 }
-
-
-
 
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd,bool should_close){
@@ -169,6 +185,8 @@ ssize_t Server::patch_file_endpoint(string& body,const string& path,const i32 cl
       string res=response(STATUS::OK,"File updated successfully",should_close);
       return send_all(client_fd,res.c_str(),res.size());
 }
+
+
 
 ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path,bool should_close){
       std::filesystem::path file_path(path);
@@ -331,13 +349,9 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 
 
 void Server::start_server(i8 *__directory){
-   i32 server_fd=socket(AF_INET,SOCK_STREAM,0);
-    
 
-  
-    make_socket_non_blocking(server_fd);
-
-   
+   i32 server_fd=socket(AF_INET,SOCK_STREAM,0);   
+    make_socket_non_blocking(server_fd);   
    if(server_fd<0){
       error("socket FD creation error");
       exit(EXIT_FAILURE);
@@ -367,35 +381,22 @@ void Server::start_server(i8 *__directory){
       exit(EXIT_FAILURE);
    }
    
-   
   
    
-   std::cout<< WHITE << "Waiting for client connection" <<RESET <<std::endl;
-     
-    
-
+      std::cout<< WHITE << "Server is listening on PORT " <<PORT<<RESET <<std::endl;
 
      /*
         We will monitor this socket for incoming client connections
      */
 
-     epoll_event event{};
-     event.data.fd=server_fd;
-     event.events=EPOLLIN;
-
-     if(epoll_ctl(epfd, EPOLL_CTL_ADD, server_fd, &event)==-1){
-        error("Failed to add the server fd to epoll");
+     if(create_epoll_event(server_fd)==-1){
         exit(EXIT_FAILURE);
      }
 
+
      std::vector<epoll_event> events(1024);
- 
-         
-    FDGuard guard(server_fd,epfd, mtx);
+     FDGuard guard(server_fd,epfd,mtx);
   
-
-
-   
    while(1){
       
         i32 n;
@@ -411,8 +412,6 @@ void Server::start_server(i8 *__directory){
   
      
    
-    
-
       for(int i=0;i<n;i++){
             
               if(events[i].data.fd==server_fd){
@@ -420,33 +419,18 @@ void Server::start_server(i8 *__directory){
    
                   if(client_fd>=0){
                        make_socket_non_blocking(client_fd);
-                       
-                       epoll_event client_event{};
-
-                       client_event.data.fd=client_fd;
-                       client_event.events=EPOLLIN;
-                       {
-                          std::unique_lock<std::mutex> lock(mtx);
-                          epoll_ctl(epfd,EPOLL_CTL_ADD,client_fd,&client_event);
-                       }
-                       
-                     
+                        create_epoll_event(client_fd);
                   }
    
-        
+              
               }else{
 
-                  
-                  
                    CLIENT_ARGS client_args;
              
                    client_args.client_fd=events[i].data.fd;
                    client_args.file_path=__directory;
 
-                   {
-                               std::unique_lock<std::mutex> lock(mtx);
-                             epoll_ctl(epfd,EPOLL_CTL_DEL,client_args.client_fd,nullptr);
-                   }
+         
                 
                   thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path](){
                      handle_client({client_fd, directory});
@@ -454,16 +438,10 @@ void Server::start_server(i8 *__directory){
 
                   }
 
-
-         
-
       }
 
         
    }
-
-
-     
 
 
 }
@@ -508,12 +486,15 @@ i32 Server::accept_client_connection(i32 server_fd){
 
 void Server::handle_client(const CLIENT_ARGS& client_args){
 
-   
+  
+
+    
     try{
 
-
+      int i=0;
+       
       while(true){
-
+         i++;
          string headers=read_headers(client_args.client_fd);
 
          if(headers.empty()) break;
@@ -579,24 +560,16 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
             throw ServerException("Error sending response");
          }
 
-         if(should_close) break;
-      
+         if(should_close){
 
-             epoll_event ev{};
-            ev.data.fd = client_args.client_fd;
-            ev.events = EPOLLIN; 
-            std::unique_lock<std::mutex> lock(mtx);
-            if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_args.client_fd, &ev) == -1) {
-              
-               if (errno == EEXIST)
-                     epoll_ctl(epfd, EPOLL_CTL_MOD, client_args.client_fd, &ev);
-            }
-
+            FDGuard fdguard(client_args.client_fd,epfd,mtx);
+            break;
+         } 
             return;
       }
 
-       
- 
+    
+
     }catch(const ServerException& e){
          
         std::cerr<<RED<<e.what()<<RESET<<"\n";
@@ -624,12 +597,15 @@ void Server::handle_client(const CLIENT_ARGS& client_args){
         std::cerr<<RED<<"Unhandled exception"<<RESET<<"\n";
         internal_server_error(client_args.client_fd);
       
-      
     }
 
-   close(client_args.client_fd);
-
+   
 }
+
+
+//helpers of handle_client function
+
+ 
 
 
 string Server::read_body(i32 client_fd,string& headers,size_t content_len){
@@ -652,8 +628,6 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
 
    while(body.size()<content_len){
 
-         //  FDGuard guard(client_fd,epfd, mtx);
- 
           ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
             
           if(received_bytes>0){

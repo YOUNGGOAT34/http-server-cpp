@@ -112,9 +112,10 @@ class Server{
             string get_header_value(string request,HEADERS header);
             string read_headers(i32 client_fd);
             string read_body(i32 client_fd,string& headers,size_t content_len);
+            i32 create_epoll_event(i32 fd);
             
             
-
+    
 
             
     public:
@@ -138,6 +139,7 @@ class Server{
 
 //epoll guard
 struct FDGuard {
+
     i32 fd;
     i32 epfd;
     std::mutex& mtx;
@@ -148,20 +150,18 @@ struct FDGuard {
     FDGuard(FDGuard&&) = delete;
     FDGuard& operator=(FDGuard&&) = delete;
 
-    FDGuard(i32 fd_, i32 epfd_, std::mutex& mtx_)
-    : fd(fd_), epfd(epfd_), mtx(mtx_) {}
+    FDGuard(i32 fd_,i32 epfd_,std::mutex& mtx_)
+    : fd(fd_),epfd(epfd_),mtx(mtx_){}
 
     ~FDGuard() {
 
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
-           
-
+       {
+              std::unique_lock<std::mutex> lock(mtx);
+              epoll_ctl(epfd,EPOLL_CTL_DEL,fd,nullptr);
+              close(fd);  
         }
-     
 
-        
+
     }
 
 
