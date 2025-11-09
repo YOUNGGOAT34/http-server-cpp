@@ -622,7 +622,6 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
     }
 
     
-
    while(body.size()<content_len){
 
           ssize_t received_bytes=recv(client_fd,buffer,BUFFER_SIZE-1,0);
