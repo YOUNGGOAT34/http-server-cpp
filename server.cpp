@@ -375,7 +375,7 @@ void Server::start_server(i8 *__directory){
       exit(EXIT_FAILURE);
    }
    
-   i32 connection_backlog=50;
+   i32 connection_backlog=1000;
    if(listen(server_fd,connection_backlog)!=0){
       error("Failed to listen on PORT 4221");
       exit(EXIT_FAILURE);
