@@ -99,20 +99,16 @@ ssize_t Server::user_agent_endpoint(const i32 client_fd,const hashMap<string,str
    }
    
    string res=response(STATUS::OK,headers.at("User-Agent"),should_close);
-  
    return send_all(client_fd,res.c_str(),res.size());
 }
 
 
 ssize_t Server::echo_endpoint(const string& path,const i32 client_fd,bool should_close){
    string res=response(STATUS::OK,extract_request_body_from_path(path),should_close);
-   
    return send_all(client_fd,res.c_str(),res.size());
 }
 
-
 ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close){
-       
            write_response_to_file(path,body);
            string res=response(STATUS::OK,"Created successfully",should_close);
            return send_all(client_fd,res.c_str(),res.size());
@@ -122,19 +118,12 @@ ssize_t Server::post_file_endpoint(const string& path,const i32 client_fd,string
 
 
 ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path,bool should_close){
-   
-
       size_t file_size;
-      i8 *buffer=read_file_contents(path,file_size);
-       
-      std::string body(buffer,file_size);
+      std::unique_ptr<i8[]> buffer(read_file_contents(path,file_size));
+      std::string body(buffer.get(),file_size);
       string res= response(STATUS::OK,body,should_close);
-      delete[] buffer;
       return send_all(client_fd,res.c_str(),res.size());
-
-
 }
-
 
 ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close){
     std::filesystem::path file_path(path);
@@ -233,7 +222,7 @@ ssize_t Server::delete_file_endpoint(const i32 client_fd,const string& path,bool
 }
 
 
-i8* Server::read_file_contents(const string& path,size_t& file_size){
+std::unique_ptr<i8[]> Server::read_file_contents(const string& path,size_t& file_size){
    
    std::ifstream file(path,std::ios::in | std::ios::binary | std::ios::ate);
    
@@ -244,17 +233,15 @@ i8* Server::read_file_contents(const string& path,size_t& file_size){
     file_size=file.tellg();
     file.seekg(0);
 
-    i8 *buffer=new i8[file_size];
+    std::unique_ptr<i8[]> buffer(new i8[file_size]);
 
-    file.read(buffer,file_size);
+    file.read(buffer.get(),file_size);
 
     if(!file){
-       delete[] buffer;
        throw FileIOException("Failed to read the file: "+path);
     }
-
+   
     return buffer;
-
 }
 
 /* 

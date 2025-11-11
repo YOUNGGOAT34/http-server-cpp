@@ -103,7 +103,7 @@ class Server{
             ssize_t not_found(const i32 client_fd);
             ssize_t internal_server_error(const i32 client_fd);
             ssize_t send_all(i32 client_fd, const i8* data, size_t len);
-            i8* read_file_contents(const string &path,size_t& file_size);
+            std::unique_ptr<i8[]> read_file_contents(const string &path,size_t& file_size);
             void write_response_to_file(const string &path,string& body);
             string status_code_to_string(const Server::STATUS code);
             void handle_client(const CLIENT_ARGS& client_args);
