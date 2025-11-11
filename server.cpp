@@ -125,6 +125,7 @@ ssize_t Server::get_file_endpoint(const i32 client_fd,const string& path,bool sh
       return send_all(client_fd,res.c_str(),res.size());
 }
 
+
 ssize_t Server::put_file_endpoint(const string& path,const i32 client_fd,string& body,bool should_close){
     std::filesystem::path file_path(path);
     
@@ -338,51 +339,12 @@ hashMap<string,string> Server::extract_headers(const i8 *buffer){
 void Server::start_server(i8 *__directory){
 
    i32 server_fd=socket(AF_INET,SOCK_STREAM,0);   
-    make_socket_non_blocking(server_fd);   
-   if(server_fd<0){
-      error("socket FD creation error");
-      exit(EXIT_FAILURE);
-   }
    
-   i32 reuse=1;
-   
-   if(setsockopt(server_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse))<0){
-      error("Setting the address to be reusable failed");
-      exit(EXIT_FAILURE);
-   }
-   
-   SA server_address;
-   
-   server_address.sin_family=AF_INET;
-   server_address.sin_addr.s_addr=INADDR_ANY;
-   server_address.sin_port=htons(PORT);
-   
-   if(bind(server_fd,(const struct sockaddr *)&server_address,sizeof(server_address))!=0){
-      error("Failed to bind the server file descriptor to this address");
-      exit(EXIT_FAILURE);
-   }
-   
-   i32 connection_backlog=1000;
-   if(listen(server_fd,connection_backlog)!=0){
-      error("Failed to listen on PORT 4221");
-      exit(EXIT_FAILURE);
-   }
-   
-  
-   
-      std::cout<< WHITE << "Server is listening on PORT " <<PORT<<RESET <<std::endl;
-
-     /*
-        We will monitor this socket for incoming client connections
-     */
-
-     if(create_epoll_event(server_fd)==-1){
-        exit(EXIT_FAILURE);
-     }
+   prepare_server(server_fd);
 
 
-     std::vector<epoll_event> events(1024);
-     FDGuard guard(server_fd,epfd,mtx);
+   std::vector<epoll_event> events(1024);
+   FDGuard guard(server_fd,epfd,mtx);
   
    while(1){
       
@@ -397,8 +359,6 @@ void Server::start_server(i8 *__directory){
           continue;
       }
   
-     
-   
       for(int i=0;i<n;i++){
             
               if(events[i].data.fd==server_fd){
@@ -424,7 +384,6 @@ void Server::start_server(i8 *__directory){
                        });
 
                   }
-
       }
 
         
@@ -436,6 +395,52 @@ void Server::start_server(i8 *__directory){
 /*
    Helpers of start server function
 */
+
+
+void Server::prepare_server(i32 server_fd){
+         make_socket_non_blocking(server_fd);   
+         if(server_fd<0){
+                  error("socket FD creation error");
+                  exit(EXIT_FAILURE);
+           }
+         
+         i32 reuse=1;
+         
+         if(setsockopt(server_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse))<0){
+                  error("Setting the address to be reusable failed");
+                  exit(EXIT_FAILURE);
+           }
+         
+         SA server_address;
+         
+         server_address.sin_family=AF_INET;
+         server_address.sin_addr.s_addr=INADDR_ANY;
+         server_address.sin_port=htons(PORT);
+         
+            if(bind(server_fd,(const struct sockaddr *)&server_address,sizeof(server_address))!=0){
+               error("Failed to bind the server file descriptor to this address");
+               exit(EXIT_FAILURE);
+            }
+         
+         i32 connection_backlog=1000;
+         if(listen(server_fd,connection_backlog)!=0){
+            error("Failed to listen on PORT 4221");
+            exit(EXIT_FAILURE);
+         }
+         
+      
+         
+         std::cout<< WHITE << "Server is listening on PORT " <<PORT<<RESET <<std::endl;
+
+         /*
+            We will monitor this socket for incoming client connections
+         */
+
+         if(create_epoll_event(server_fd)==-1){
+            exit(EXIT_FAILURE);
+         }
+
+}
 
 
 i32 Server::make_socket_non_blocking(i32 fd){
