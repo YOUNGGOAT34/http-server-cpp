@@ -464,7 +464,8 @@ i32 Server::accept_client_connection(i32 server_fd){
                     return -1;
                 }
                   
-
+               
+                std::cout<<"Accepted a new connection"<<std::endl;
 
                   return client_fd;
     
