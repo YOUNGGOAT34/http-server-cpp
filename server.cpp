@@ -635,7 +635,6 @@ string Server::read_body(i32 client_fd,string& headers,size_t content_len){
                    
                       throw NetworkException("Error receiving client request");
                    }
-                
           }
 
           
