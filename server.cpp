@@ -359,7 +359,7 @@ void Server::start_server(i8 *__directory){
           continue;
       }
   
-      for(int i=0;i<n;i++){
+      for(i32 i=0;i<n;i++){
             
               if(events[i].data.fd==server_fd){
                     i32 client_fd=accept_client_connection(server_fd);
