@@ -355,7 +355,7 @@ void Server::start_server(i8 *__directory){
        }
       
       if(n==-1){
-          error("Poll failed");
+          error("epoll failed");
           continue;
       }
   
@@ -368,7 +368,7 @@ void Server::start_server(i8 *__directory){
                        make_socket_non_blocking(client_fd);
                         create_epoll_event(client_fd);
                   }
-   
+             
               
               }else{
 
