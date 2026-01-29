@@ -1,0 +1,168 @@
+# Epoll-Based Multi-Threaded HTTP Server
+
+A **high-performance HTTP/1.1 server written in modern C++** using **`epoll`**, **non-blocking sockets**, and a **custom thread pool**. This project demonstrates low-level Linux networking, event-driven design, concurrency control, and robust file-backed REST APIs.
+
+This server is designed as a **systems-level learning project** and closely mirrors real-world backend infrastructure patterns used in high-scale services.
+
+---
+
+## Features
+
+* Event-driven architecture using **Linux `epoll`**
+* Non-blocking sockets with correct handling of `EAGAIN` / `EWOULDBLOCK`
+* **Multi-threaded request processing** via a custom thread pool
+* HTTP/1.1 request parsing (request line, headers, body)
+* Persistent connections (`keep-alive` / `close`)
+* File-backed REST API supporting:
+
+  * `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
+* Thread-safe epoll and file descriptor lifecycle management
+* RAII-based FD cleanup using guard objects
+* Graceful error handling with structured exceptions
+* Concurrent-safe logging and error reporting
+
+---
+
+## Architecture Overview
+
+* **Main thread**
+
+  * Accepts connections
+  * Registers file descriptors with `epoll`
+
+* **Event loop**
+
+  * Uses `epoll_wait` to detect readable sockets
+
+* **Worker threads**
+
+  * Handle HTTP parsing, routing, and responses
+  * Process requests concurrently using a producer-consumer queue
+
+* **RAII Guards**
+
+  * Automatically deregister and close file descriptors
+  * Prevent resource leaks under exceptions or early exits
+
+---
+
+## Supported Endpoints
+
+### `/echo/{value}`
+
+Returns the value embedded in the URL path.
+
+### `/user-agent`
+
+Returns the client's `User-Agent` header.
+
+### `/files/{path}`
+
+File-backed REST API:
+
+| Method   | Behavior               |
+| -------- | ---------------------- |
+| `GET`    | Read file contents     |
+| `POST`   | Create file            |
+| `PUT`    | Create or replace file |
+| `PATCH`  | Append to file         |
+| `DELETE` | Delete file            |
+
+All file operations automatically create parent directories when required.
+
+---
+
+## Requirements
+
+* Linux (epoll-based, not portable to macOS/Windows)
+* GCC or Clang with C++20 support
+* POSIX-compliant environment
+
+---
+
+## Compilation
+
+```bash
+ make all
+```
+
+---
+
+## Usage
+
+```bash
+./http_server <base_directory>
+```
+
+* `<base_directory>` is the root directory used for file-backed endpoints
+
+### Example
+
+```bash
+./http_server ./data/
+```
+
+Server listens on **PORT 4221**.
+
+---
+
+## HTTP Behavior
+
+* Supports persistent connections (`keep-alive`)
+* Correctly handles partial reads and writes
+* Ensures full transmission using a `send_all` loop
+* Parses headers and body separately for correctness
+
+---
+
+## Error Handling
+
+* Network errors handled explicitly (`ECONNRESET`, `EAGAIN`, `EBADF`)
+* File I/O failures reported via structured exceptions
+* Returns correct HTTP status codes:
+
+  * `200 OK`
+  * `201 Created`
+  * `404 Not Found`
+  * `500 Internal Server Error`
+
+---
+
+## Thread Safety & Concurrency
+
+* `epoll_ctl` protected via mutex
+* Thread pool uses condition variables and atomic shutdown flags
+* No shared mutable state between client handlers
+
+---
+
+## Design Highlights
+
+* **epoll over poll/select** for scalability
+* **RAII guards** ensure no FD leaks
+* **Exception-safe networking code**
+* **Clear separation of concerns** between I/O, parsing, routing, and execution
+
+---
+
+## Limitations
+
+* HTTP/1.1 only (no HTTP/2)
+* No TLS support
+* Text-based responses only
+
+---
+
+## Educational Value
+
+This project demonstrates:
+
+* Linux kernel event notification (`epoll`)
+* Non-blocking socket programming
+* Concurrent system design
+* Resource lifetime management
+* Real-world HTTP server fundamentals
+
+---
+
+
