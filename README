@@ -83,7 +83,9 @@ All file operations automatically create parent directories when required.
 ## Compilation
 
 ```bash
+
  make all
+ 
 ```
 
 ---
