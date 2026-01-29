@@ -378,7 +378,6 @@ void Server::start_server(i8 *__directory){
                    client_args.file_path=__directory;
 
          
-                
                   thread_pool.enqueue([this, client_fd = client_args.client_fd, directory = client_args.file_path](){
                      handle_client({client_fd, directory});
                        });
